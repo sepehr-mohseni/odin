@@ -1,0 +1,32 @@
+server:
+  port: 8080
+  readTimeout: 5s
+  writeTimeout: 10s
+  gracefulTimeout: 15s
+  compression: true
+logging:
+  level: info
+  json: true
+auth:
+  accessTokenTTL: 1h0m0s
+  refreshTokenTTL: 24h0m0s
+  ignorePathRegexes:
+    - ^/health$
+    - ^/metrics$
+    - ^/aggregate$
+    - ^/admin/?.*$
+rateLimit:
+  enabled: true
+  limit: 100
+  duration: 1m0s
+  strategy: local
+  redisUrl: redis://localhost:6379
+cache:
+  enabled: true
+  ttl: 5m0s
+  redisUrl: redis://localhost:6379
+  strategy: local
+  maxSizeInMB: 100
+monitoring:
+  enabled: true
+  path: /metrics

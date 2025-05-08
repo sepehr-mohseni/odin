@@ -1,0 +1,64 @@
+openapi: 3.0.0
+info:
+  title: Odin API Gateway
+  description: API specification for Odin API Gateway
+  version: 1.0.0
+  contact:
+    email: your.email@example.com
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the current health status of the API gateway
+      responses:
+        '200':
+          description: Gateway is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: UP
+
+  /metrics:
+    get:
+      summary: Prometheus metrics endpoint
+      description: Provides Prometheus metrics for the API gateway
+      responses:
+        '200':
+          description: Metrics data
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /admin/login:
+    post:
+      summary: Admin login
+      description: Authenticates admin users
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Authentication successful
+        '401':
+          description: Authentication failed

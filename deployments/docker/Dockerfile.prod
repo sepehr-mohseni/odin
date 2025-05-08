@@ -1,0 +1,50 @@
+# Build stage
+FROM golang:1.24-alpine AS builder
+
+WORKDIR /app
+
+# Install build dependencies
+RUN apk add --no-cache git
+
+# First copy only go.mod and go.sum for efficient caching of dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source code
+COPY . .
+
+# Build with production optimizations
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s -X main.version=$(git describe --tags --always --dirty)" \
+    -o /odin cmd/odin/main.go
+
+# Final minimal image
+FROM alpine:latest
+
+# Add necessary runtime packages
+RUN apk --no-cache add ca-certificates tzdata
+
+WORKDIR /app
+
+# Copy the binary from builder stage
+COPY --from=builder /odin .
+
+# Copy templates and config
+COPY --from=builder /app/pkg/admin/templates/ ./pkg/admin/templates/
+COPY --from=builder /app/config/default_config.yaml ./config/config.yaml
+
+# Create volume mount points
+VOLUME ["/app/config"]
+
+# Expose ports
+EXPOSE 8080 8081
+
+# Set user
+RUN adduser -D -u 1000 odin
+USER odin
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD wget -q -O- http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["/app/odin"]

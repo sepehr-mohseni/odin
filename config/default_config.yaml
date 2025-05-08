@@ -1,0 +1,65 @@
+# Odin API Gateway Default Configuration
+gateway:
+  port: 8080
+  adminPort: 8081
+  logLevel: info
+  timeout: 30s
+  maxIdleConns: 100
+  maxIdleConnsPerHost: 100
+  idleConnTimeout: 90s
+
+monitoring:
+  enabled: true
+  prometheusEndpoint: /metrics
+
+cache:
+  enabled: true
+  type: memory # memory or redis
+  ttl: 60s
+  redis:
+    host: localhost
+    port: 6379
+    password: ''
+    db: 0
+
+rateLimit:
+  enabled: true
+  requestsPerMinute: 60
+
+auth:
+  enabled: true
+  jwtSecret: 'REPLACE_WITH_SECURE_SECRET'
+  excludedPaths:
+    - /health
+    - /metrics
+    - /api/public
+
+admin:
+  enabled: true
+  username: admin
+  # Default password is 'admin' - change this in production
+  passwordHash: '$2a$10$3euPcmQFCiblsZeEu5s7p.9mSMuPJHj7nHnbGKgIZzJtLy0WsMUJO'
+
+services:
+  # Example service configuration
+  users:
+    name: users
+    basePath: /api/users
+    stripBasePath: true
+    targets:
+      - http://localhost:8081
+    timeout: 10s
+    retryCount: 3
+    authentication: true
+    loadBalancing: round-robin
+
+  products:
+    name: products
+    basePath: /api/products
+    stripBasePath: true
+    targets:
+      - http://localhost:8083
+    timeout: 5s
+    retryCount: 2
+    authentication: false
+    loadBalancing: round-robin

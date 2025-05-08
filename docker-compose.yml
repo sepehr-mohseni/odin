@@ -1,0 +1,125 @@
+version: '3.8'
+
+services:
+  odin:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '8080:8080'
+      - '8081:8081'
+    volumes:
+      - ./config:/app/config
+    depends_on:
+      - redis
+      - users-service
+      - products-service
+      - orders-service
+      - categories-service
+    environment:
+      - GATEWAY_PORT=8080
+      - LOG_LEVEL=info
+    networks:
+      - odin-network
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O-', 'http://localhost:8080/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    ports:
+      - '6379:6379'
+    networks:
+      - odin-network
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./monitoring/prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.console.libraries=/etc/prometheus/console_libraries
+      - --web.console.templates=/etc/prometheus/consoles
+    networks:
+      - odin-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - odin-network
+    restart: unless-stopped
+
+  users-service:
+    build:
+      context: ./test/services
+      dockerfile: Dockerfile
+    command: ['node', 'users-service/server.js']
+    ports:
+      - '8081:8081'
+    networks:
+      - odin-network
+    restart: unless-stopped
+
+  products-service:
+    build:
+      context: ./test/services
+      dockerfile: Dockerfile
+    command: ['node', 'products-service/server.js']
+    ports:
+      - '8083:8083'
+    networks:
+      - odin-network
+    restart: unless-stopped
+
+  orders-service:
+    build:
+      context: ./test/services
+      dockerfile: Dockerfile
+    command: ['node', 'orders-service/server.js']
+    ports:
+      - '8084:8084'
+    networks:
+      - odin-network
+    restart: unless-stopped
+    depends_on:
+      - users-service
+      - products-service
+
+  categories-service:
+    build:
+      context: ./test/services
+      dockerfile: Dockerfile
+    command: ['node', 'categories-service/server.js']
+    ports:
+      - '8085:8085'
+    networks:
+      - odin-network
+    restart: unless-stopped
+
+networks:
+  odin-network:
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:

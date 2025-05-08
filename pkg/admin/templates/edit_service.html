@@ -1,0 +1,468 @@
+{{define "edit_service.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit Service - Odin API Gateway Admin</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <style>
+      body {
+        padding-top: 20px;
+        padding-bottom: 40px;
+      }
+      .nav-link.active {
+        font-weight: bold;
+      }
+      .container {
+        max-width: 1200px;
+      }
+      .form-group {
+        margin-bottom: 1rem;
+      }
+      .mapping-row {
+        background-color: #f8f9fa;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+      }
+      .dependency-card {
+        background-color: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+        border-left: 4px solid #0d6efd;
+      }
+    </style>
+</head>
+<body>
+    <div class="container">
+      <header class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom">
+        <a href="/admin/dashboard" class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none">
+          <span class="fs-4">Odin API Gateway Admin</span>
+        </a>
+        <ul class="nav nav-pills">
+          <li class="nav-item"><a href="/admin/dashboard" class="nav-link">Dashboard</a></li>
+          <li class="nav-item"><a href="/admin/services/new" class="nav-link">Add Service</a></li>
+          <li class="nav-item"><a href="/admin/login" class="nav-link">Logout</a></li>
+        </ul>
+      </header>
+
+      <div class="row">
+        <div class="col-12">
+            <h2>Edit Service: {{.Service.Name}}</h2>
+            
+            <div id="form-messages"></div>
+            
+            <form hx-post="/admin/services/{{.Service.Name}}" hx-target="#form-messages" hx-swap="innerHTML">
+                <!-- Basic service configuration -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5>Basic Configuration</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="basePath">Base Path</label>
+                                    <input type="text" class="form-control" id="basePath" name="basePath" 
+                                        value="{{.Service.BasePath}}" required>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="stripBasePath">Strip Base Path</label>
+                                    <select class="form-control" id="stripBasePath" name="stripBasePath">
+                                        <option value="true" {{if .Service.StripBasePath}}selected{{end}}>Yes</option>
+                                        <option value="false" {{if not .Service.StripBasePath}}selected{{end}}>No</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mt-3">
+                            <label for="targets">Targets (one per line)</label>
+                            <textarea class="form-control" id="targets" name="targets" rows="3" required>{{range .Service.Targets}}{{.}}
+{{end}}</textarea>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="timeout">Timeout (seconds)</label>
+                                    <input type="number" class="form-control" id="timeout" name="timeout" 
+                                        value="{{.Service.Timeout.Seconds}}" required>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="retryCount">Retry Count</label>
+                                    <input type="number" class="form-control" id="retryCount" name="retryCount" 
+                                        value="{{.Service.RetryCount}}" required>
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    <label for="authentication">Authentication</label>
+                                    <select class="form-control" id="authentication" name="authentication">
+                                        <option value="true" {{if .Service.Authentication}}selected{{end}}>Required</option>
+                                        <option value="false" {{if not .Service.Authentication}}selected{{end}}>Not Required</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group mt-3">
+                            <label for="loadBalancing">Load Balancing Strategy</label>
+                            <select class="form-control" id="loadBalancing" name="loadBalancing">
+                                <option value="round-robin" {{if eq .Service.LoadBalancing "round-robin"}}selected{{end}}>Round Robin</option>
+                                <option value="random" {{if eq .Service.LoadBalancing "random"}}selected{{end}}>Random</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Aggregation Configuration -->
+                <div class="card mb-4">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5>Data Aggregation</h5>
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="enableAggregation" name="enableAggregation" 
+                                   {{if and .Service.Aggregation (gt (len .Service.Aggregation.Dependencies) 0)}}checked{{end}}>
+                            <label class="form-check-label" for="enableAggregation">Enable</label>
+                        </div>
+                    </div>
+                    <div class="card-body" id="aggregationConfig">
+                        <div id="dependencies-container">
+                            <!-- Existing dependencies -->
+                            {{if .Service.Aggregation}}
+                                {{range $index, $dep := .Service.Aggregation.Dependencies}}
+                                    <div class="dependency-card" id="dependency-{{$index}}">
+                                        <div class="d-flex justify-content-between align-items-center mb-3">
+                                            <h6>Dependency #{{$index}}</h6>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" 
+                                                    onclick="removeDependency({{$index}})">Remove</button>
+                                        </div>
+                                        
+                                        <input type="hidden" name="dependencies[{{$index}}].id" value="{{$index}}">
+                                        
+                                        <div class="row mb-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Dependent Service</label>
+                                                <select class="form-control" name="dependencies[{{$index}}].service" required>
+                                                    {{range $.AvailableServices}}
+                                                        <option value="{{.Name}}" {{if eq .Name $dep.Service}}selected{{end}}>{{.Name}}</option>
+                                                    {{end}}
+                                                </select>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Path</label>
+                                                <input type="text" class="form-control" name="dependencies[{{$index}}].path" 
+                                                       value="{{$dep.Path}}" placeholder="/api/resource/{param}" required>
+                                                <div class="form-text">Use {paramName} as placeholder for parameters</div>
+                                            </div>
+                                        </div>
+                                        
+                                        <h6 class="mb-2">Parameter Mapping</h6>
+                                        <div class="parameter-mappings">
+                                            {{range $mapIndex, $mapping := $dep.ParameterMapping}}
+                                                <div class="row mapping-row">
+                                                    <div class="col-md-5">
+                                                        <label class="form-label">From (JSONPath)</label>
+                                                        <input type="text" class="form-control" 
+                                                               name="dependencies[{{$index}}].paramMapping[{{$mapIndex}}].from" 
+                                                               value="{{$mapping.From}}" placeholder="$.field.id">
+                                                    </div>
+                                                    <div class="col-md-5">
+                                                        <label class="form-label">To (Parameter)</label>
+                                                        <input type="text" class="form-control" 
+                                                               name="dependencies[{{$index}}].paramMapping[{{$mapIndex}}].to" 
+                                                               value="{{$mapping.To}}" placeholder="paramName">
+                                                    </div>
+                                                    <div class="col-md-2 d-flex align-items-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                                                onclick="removeMapping(this)">Remove</button>
+                                                    </div>
+                                                </div>
+                                            {{end}}
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" 
+                                                onclick="addParameterMapping({{$index}})">Add Parameter Mapping</button>
+                                                
+                                        <h6 class="mb-2 mt-3">Result Mapping</h6>
+                                        <div class="result-mappings">
+                                            {{range $mapIndex, $mapping := $dep.ResultMapping}}
+                                                <div class="row mapping-row">
+                                                    <div class="col-md-5">
+                                                        <label class="form-label">From (Source JSONPath)</label>
+                                                        <input type="text" class="form-control" 
+                                                               name="dependencies[{{$index}}].resultMapping[{{$mapIndex}}].from" 
+                                                               value="{{$mapping.From}}" placeholder="$">
+                                                    </div>
+                                                    <div class="col-md-5">
+                                                        <label class="form-label">To (Target JSONPath)</label>
+                                                        <input type="text" class="form-control" 
+                                                               name="dependencies[{{$index}}].resultMapping[{{$mapIndex}}].to" 
+                                                               value="{{$mapping.To}}" placeholder="$.field.details">
+                                                    </div>
+                                                    <div class="col-md-2 d-flex align-items-end">
+                                                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                                                onclick="removeMapping(this)">Remove</button>
+                                                    </div>
+                                                </div>
+                                            {{end}}
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary mt-2" 
+                                                onclick="addResultMapping({{$index}})">Add Result Mapping</button>
+                                    </div>
+                                {{end}}
+                            {{end}}
+                        </div>
+                        
+                        <div id="no-dependencies-message" {{if and .Service.Aggregation (gt (len .Service.Aggregation.Dependencies) 0)}}style="display: none;"{{end}}>
+                            <div class="alert alert-info">No dependencies configured. Add a dependency to enable data aggregation.</div>
+                        </div>
+                        
+                        <button type="button" id="add-dependency-btn" class="btn btn-primary mt-3" 
+                                {{if not (and .Service.Aggregation (gt (len .Service.Aggregation.Dependencies) 0))}}style="display: none;"{{end}}
+                                onclick="addDependency()">Add Dependency</button>
+                    </div>
+                </div>
+                
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <a href="/admin/dashboard" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+      </div>
+
+      <footer class="pt-4 my-md-5 pt-md-5 border-top">
+        <div class="row">
+          <div class="col-12 col-md text-center">
+            <small class="d-block mb-3 text-muted">&copy; 2025-∞ Odin API Gateway - Sepehr Mohseni</small>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <!-- Template for new dependency -->
+    <template id="dependency-template">
+        <div class="dependency-card" id="dependency-{INDEX}">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6>New Dependency</h6>
+                <button type="button" class="btn btn-sm btn-outline-danger" 
+                        onclick="removeDependency({INDEX})">Remove</button>
+            </div>
+            
+            <input type="hidden" name="dependencies[{INDEX}].id" value="{INDEX}">
+            
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <label class="form-label">Dependent Service</label>
+                    <select class="form-control" name="dependencies[{INDEX}].service" required>
+                        {{range .AvailableServices}}
+                            <option value="{{.Name}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Path</label>
+                    <input type="text" class="form-control" name="dependencies[{INDEX}].path" 
+                           placeholder="/api/resource/{param}" required>
+                    <div class="form-text">Use {paramName} as placeholder for parameters</div>
+                </div>
+            </div>
+            
+            <h6 class="mb-2">Parameter Mapping</h6>
+            <div class="parameter-mappings">
+                <div class="row mapping-row">
+                    <div class="col-md-5">
+                        <label class="form-label">From (JSONPath)</label>
+                        <input type="text" class="form-control" 
+                               name="dependencies[{INDEX}].paramMapping[0].from" 
+                               placeholder="$.field.id">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">To (Parameter)</label>
+                        <input type="text" class="form-control" 
+                               name="dependencies[{INDEX}].paramMapping[0].to" 
+                               placeholder="paramName">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                onclick="removeMapping(this)">Remove</button>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-2" 
+                    onclick="addParameterMapping({INDEX})">Add Parameter Mapping</button>
+                    
+            <h6 class="mb-2 mt-3">Result Mapping</h6>
+            <div class="result-mappings">
+                <div class="row mapping-row">
+                    <div class="col-md-5">
+                        <label class="form-label">From (Source JSONPath)</label>
+                        <input type="text" class="form-control" 
+                               name="dependencies[{INDEX}].resultMapping[0].from" 
+                               placeholder="$" value="$">
+                    </div>
+                    <div class="col-md-5">
+                        <label class="form-label">To (Target JSONPath)</label>
+                        <input type="text" class="form-control" 
+                               name="dependencies[{INDEX}].resultMapping[0].to" 
+                               placeholder="$.field.details">
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" class="btn btn-outline-danger btn-sm" 
+                                onclick="removeMapping(this)">Remove</button>
+                    </div>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary mt-2" 
+                    onclick="addResultMapping({INDEX})">Add Result Mapping</button>
+        </div>
+    </template>
+    
+    <!-- Template for parameter mapping row -->
+    <template id="param-mapping-template">
+        <div class="row mapping-row">
+            <div class="col-md-5">
+                <label class="form-label">From (JSONPath)</label>
+                <input type="text" class="form-control" 
+                       name="dependencies[{DEP_INDEX}].paramMapping[{MAP_INDEX}].from" 
+                       placeholder="$.field.id">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">To (Parameter)</label>
+                <input type="text" class="form-control" 
+                       name="dependencies[{DEP_INDEX}].paramMapping[{MAP_INDEX}].to" 
+                       placeholder="paramName">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-danger btn-sm" 
+                        onclick="removeMapping(this)">Remove</button>
+            </div>
+        </div>
+    </template>
+    
+    <!-- Template for result mapping row -->
+    <template id="result-mapping-template">
+        <div class="row mapping-row">
+            <div class="col-md-5">
+                <label class="form-label">From (Source JSONPath)</label>
+                <input type="text" class="form-control" 
+                       name="dependencies[{DEP_INDEX}].resultMapping[{MAP_INDEX}].from" 
+                       placeholder="$" value="$">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">To (Target JSONPath)</label>
+                <input type="text" class="form-control" 
+                       name="dependencies[{DEP_INDEX}].resultMapping[{MAP_INDEX}].to" 
+                       placeholder="$.field.details">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-danger btn-sm" 
+                        onclick="removeMapping(this)">Remove</button>
+            </div>
+        </div>
+    </template>
+
+    <script>
+        let depIndex = {{if .Service.Aggregation}}{{len .Service.Aggregation.Dependencies}}{{else}}0{{end}};
+        
+        document.getElementById('enableAggregation').addEventListener('change', function() {
+            const aggregationConfig = document.getElementById('aggregationConfig');
+            const noDepsMessage = document.getElementById('no-dependencies-message');
+            const addDepBtn = document.getElementById('add-dependency-btn');
+            
+            if (this.checked) {
+                noDepsMessage.style.display = 'block';
+                addDepBtn.style.display = 'block';
+            } else {
+                noDepsMessage.style.display = 'none';
+                addDepBtn.style.display = 'none';
+            }
+        });
+        
+        function addDependency() {
+            const container = document.getElementById('dependencies-container');
+            const template = document.getElementById('dependency-template').innerHTML;
+            const noDepsMessage = document.getElementById('no-dependencies-message');
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = template.replace(/{INDEX}/g, depIndex);
+            container.appendChild(tempDiv.firstElementChild);
+            
+            noDepsMessage.style.display = 'none';
+            
+            depIndex++;
+        }
+        
+        function removeDependency(index) {
+            const depElement = document.getElementById(`dependency-${index}`);
+            if (depElement) {
+                depElement.remove();
+            }
+            
+            const container = document.getElementById('dependencies-container');
+            if (container.children.length === 0) {
+                document.getElementById('no-dependencies-message').style.display = 'block';
+            }
+        }
+        
+        function addParameterMapping(depIndex) {
+            const depElement = document.getElementById(`dependency-${depIndex}`);
+            const mappingsContainer = depElement.querySelector('.parameter-mappings');
+            const template = document.getElementById('param-mapping-template').innerHTML;
+            
+            const currentCount = mappingsContainer.children.length;
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = template
+                .replace(/{DEP_INDEX}/g, depIndex)
+                .replace(/{MAP_INDEX}/g, currentCount);
+            
+            mappingsContainer.appendChild(tempDiv.firstElementChild);
+        }
+        
+        function addResultMapping(depIndex) {
+            const depElement = document.getElementById(`dependency-${depIndex}`);
+            const mappingsContainer = depElement.querySelector('.result-mappings');
+            const template = document.getElementById('result-mapping-template').innerHTML;
+            
+            const currentCount = mappingsContainer.children.length;
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = template
+                .replace(/{DEP_INDEX}/g, depIndex)
+                .replace(/{MAP_INDEX}/g, currentCount);
+            
+            mappingsContainer.appendChild(tempDiv.firstElementChild);
+        }
+        
+        function removeMapping(button) {
+            const row = button.closest('.mapping-row');
+            row.remove();
+        }
+        
+        document.addEventListener('htmx:afterSwap', function(event) {
+            const redirectTo = event.detail.xhr.getResponseHeader('HX-Redirect');
+            if (redirectTo) {
+                window.location.href = redirectTo;
+            }
+        });
+
+        document.addEventListener('htmx:responseError', function(event) {
+            if (event.detail.xhr.status === 401 || event.detail.xhr.status === 403) {
+                window.location.href = '/admin/login';
+            }
+        });
+    </script>
+</body>
+</html>
+{{end}}

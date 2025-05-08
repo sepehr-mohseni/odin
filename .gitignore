@@ -1,0 +1,114 @@
+# Created by https://www.toptal.com/developers/gitignore/api/go,node
+# Edit at https://www.toptal.com/developers/gitignore?templates=go,node
+
+### Go ###
+# If you prefer the allow list template instead of the deny list, see community template:
+# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
+#
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Go specific
+*.o
+*.a
+# /pkg/
+/vendor/
+/Godeps/
+go.work
+
+# Binary files
+/bin/
+/odin
+
+### Node ###
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.pnpm-debug.log*
+
+# Diagnostic reports
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Local Configuration
+/config/admin_creds.yaml
+/config/auth_secrets.yaml
+/config/config.yaml
+/config/debug-routes.yaml
+/config/routes.yaml
+/config/services.yaml
+.env
+auth_secrets.yaml
+
+# Temp files
+*.tmp
+/tmp/
+
+# Redis dump files
+dump.rdb
+
+# Generated files
+/docs/generated/
+
+# End of https://www.toptal.com/developers/gitignore/api/go,node

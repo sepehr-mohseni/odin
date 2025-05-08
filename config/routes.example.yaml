@@ -1,0 +1,21 @@
+routes:
+  - pattern: /api/users
+    service: users
+  - pattern: /api/users/*
+    service: users
+  - pattern: /api/products
+    service: products
+  - pattern: /api/products/*
+    service: products
+  - pattern: /api/orders
+    service: orders
+  - pattern: /api/orders/*
+    service: orders
+  - pattern: /api/categories
+    service: categories
+  - pattern: /api/categories/*
+    service: categories
+  - pattern: /api/club
+    service: club
+  - pattern: /api/club/*
+    service: club

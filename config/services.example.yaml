@@ -1,0 +1,111 @@
+services:
+  - name: users
+    basePath: /api/users
+    targets:
+      - http://localhost:8081
+      - http://localhost:8082
+    stripBasePath: false
+    timeout: 5s
+    retryCount: 2
+    retryDelay: 100ms
+    authentication: true
+    loadBalancing: round-robin
+    headers:
+      X-Source: api-gateway
+    transform:
+      request:
+        - from: $.name
+          to: $.user.name
+          default: ''
+      response:
+        - from: $.data
+          to: $.result
+          default: ''
+
+  - name: products
+    basePath: /api/products
+    targets:
+      - http://localhost:8083
+    stripBasePath: false
+    timeout: 3s
+    retryCount: 1
+    retryDelay: 50ms
+    authentication: true
+    loadBalancing: round-robin
+    headers: {}
+    transform:
+      request: []
+      response: []
+    aggregation:
+      dependencies:
+        - service: categories
+          path: /api/categories/{category_id}
+          parameterMapping:
+            - from: $.categoryId
+              to: category_id
+          resultMapping:
+            - from: $
+              to: $.category
+
+  - name: orders
+    basePath: /api/orders
+    targets:
+      - http://localhost:8084
+    stripBasePath: false
+    timeout: 10s
+    retryCount: 2
+    retryDelay: 100ms
+    authentication: true
+    loadBalancing: round-robin
+    headers: {}
+    transform:
+      request: []
+      response: []
+    aggregation:
+      dependencies:
+        - service: users
+          path: /api/users/{user_id}
+          parameterMapping:
+            - from: $.userId
+              to: user_id
+          resultMapping:
+            - from: $
+              to: $.user
+        - service: products
+          path: /api/products/{product_id}
+          parameterMapping:
+            - from: $.items[*].productId
+              to: product_id
+          resultMapping:
+            - from: $
+              to: $.items[*].product
+
+  - name: categories
+    basePath: /api/categories
+    targets:
+      - http://localhost:8085
+    stripBasePath: false
+    timeout: 2s
+    retryCount: 1
+    retryDelay: 50ms
+    authentication: true
+    loadBalancing: round-robin
+    headers: {}
+    transform:
+      request: []
+      response: []
+
+  - name: club
+    basePath: /api/club
+    targets:
+      - http://localhost:5401
+    stripBasePath: false
+    timeout: 5s
+    retryCount: 1
+    retryDelay: 100ms
+    authentication: true
+    loadBalancing: round-robin
+    headers: {}
+    transform:
+      request: []
+      response: []
