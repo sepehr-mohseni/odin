@@ -16,7 +16,10 @@ func TestProxyHandlerSimpleForwarding(t *testing.T) {
 	// Setup target server
 	targetServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message":"Hello from target"}`))
+		_, err := w.Write([]byte(`{"message":"Hello from target"}`))
+		if err != nil {
+			t.Fatalf("Failed to write response: %v", err)
+		}
 	}))
 	defer targetServer.Close()
 
@@ -68,7 +71,10 @@ func TestLoadBalancing(t *testing.T) {
 	target1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		target1Hits++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"server":"target1"}`))
+		_, err := w.Write([]byte(`{"server":"target1"}`))
+		if err != nil {
+			t.Fatalf("Failed to write response: %v", err)
+		}
 	}))
 	defer target1.Close()
 
@@ -76,7 +82,10 @@ func TestLoadBalancing(t *testing.T) {
 	target2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		target2Hits++
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"server":"target2"}`))
+		_, err := w.Write([]byte(`{"server":"target2"}`))
+		if err != nil {
+			t.Fatalf("Failed to write response: %v", err)
+		}
 	}))
 	defer target2.Close()
 
@@ -124,23 +133,23 @@ func TestLoadBalancing(t *testing.T) {
 func TestProxyHandlerBasic(t *testing.T) {
 	// Basic test setup code
 	w := httptest.NewRecorder()
-	
+
 	// Fix line 19
 	_, err := w.Write([]byte("test response"))
 	if err != nil {
 		t.Fatalf("Failed to write response: %v", err)
 	}
-	
+
 	// More test code...
-	
+
 	// Fix line 71
 	_, err = w.Write([]byte("another test response"))
 	if err != nil {
 		t.Fatalf("Failed to write response: %v", err)
 	}
-	
+
 	// More test code...
-	
+
 	// Fix line 79
 	_, err = w.Write([]byte("final test response"))
 	if err != nil {
