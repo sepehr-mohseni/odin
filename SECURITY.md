@@ -13,7 +13,7 @@ We currently support the following versions with security updates:
 We take the security of Odin API Gateway seriously. If you believe you have found a security vulnerability, please follow these steps:
 
 1. **Do NOT disclose the vulnerability publicly**
-2. **Email us at [your-security-email@example.com]** with details about the vulnerability
+2. **Email us at [isepehrmohseni@gmail.com]** with details about the vulnerability
 3. Allow us time to investigate and address the vulnerability
 4. We will coordinate with you on the disclosure timeline
 
