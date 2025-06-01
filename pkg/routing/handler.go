@@ -119,9 +119,8 @@ func (h *ServiceHandler) createProxyRequest(c echo.Context, targetURL string) (*
 	if c.Request().Body != nil {
 		bodyBytes, err := io.ReadAll(c.Request().Body)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read request body: %w", err)
 		}
-		c.Request().Body = io.NopCloser(bytes.NewReader(bodyBytes))
 		body = bytes.NewReader(bodyBytes)
 	}
 

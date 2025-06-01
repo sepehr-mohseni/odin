@@ -1,111 +1,68 @@
 # Odin API Gateway
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)
-![Build Status](https://github.com/sepehr-mohseni/odin/workflows/CI/badge.svg)
-![Test Coverage](https://codecov.io/gh/sepehr-mohseni/odin/branch/main/graph/badge.svg)
-![Go Report Card](https://goreportcard.com/badge/github.com/sepehr-mohseni/odin)
+[![CI](https://github.com/YOUR_USERNAME/odin/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/odin/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/YOUR_USERNAME/odin/branch/main/graph/badge.svg)](https://codecov.io/gh/YOUR_USERNAME/odin)
+[![Go Report Card](https://goreportcard.com/badge/github.com/YOUR_USERNAME/odin)](https://goreportcard.com/report/github.com/YOUR_USERNAME/odin)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Odin is a high-performance, feature-rich API Gateway built in Go. It serves as a central entry point for managing microservice architectures with features like request routing, authentication, response aggregation, and more.
+A high-performance, feature-rich API Gateway written in Go.
 
-## ✨ Features
+## Features
 
-![Architecture Overview](docs/images/odin-architecture.png)
+- **Load Balancing**: Round-robin and random algorithms
+- **Authentication**: JWT and OAuth2 support
+- **Rate Limiting**: Multiple algorithms (token bucket, sliding window, fixed window)
+- **Caching**: TTL, conditional, and user context strategies
+- **Circuit Breaker**: Fault tolerance and resilience
+- **WebSocket Proxying**: Full WebSocket support
+- **Response Aggregation**: Combine multiple service responses
+- **Admin Interface**: Web-based configuration management
+- **Monitoring**: Prometheus metrics integration
+- **Health Checks**: Readiness and liveness probes
 
-- **Dynamic Service Routing** - Route requests to the appropriate backend services
-- **Authentication & Authorization** - Secure your APIs with JWT-based access control
-- **Response Aggregation** - Combine responses from multiple services into a single response
-- **Request Transformation** - Modify requests and responses with JSONPath transformations
-- **Load Balancing** - Distribute requests across multiple service instances
-- **Monitoring & Metrics** - Prometheus metrics for observability
-- **Caching** - Reduce backend load with response caching
-- **Rate Limiting** - Protect your services from overuse
-- **Admin UI** - Web-based configuration interface
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Go 1.24 or later
-- Docker and Docker Compose (optional, for containerized deployment)
-
-### Installation
+## Quick Start
 
 ```bash
 # Clone the repository
-git clone https://github.com/sepehr-mohseni/odin.git
+git clone https://github.com/YOUR_USERNAME/odin.git
 cd odin
 
-# Install dependencies
-go mod download
-
-# Build the gateway
+# Build the binary
 go build -o bin/odin cmd/odin/main.go
+
+# Run with default configuration
+./bin/odin -config=config/config.yaml
 ```
 
-### Quick Start
+## Configuration
 
-```bash
-# Copy the example configuration
-cp config/default_config.yaml config/config.yaml
-cp config/auth_secrets.yaml.example config/auth_secrets.yaml
+Create a `config/config.yaml` file:
 
-# Start the gateway
-./bin/odin --config config/config.yaml
+```yaml
+server:
+  port: 8080
+  timeout: 30s
+
+logging:
+  level: info
+  json: false
+
+services:
+  - name: 'user-service'
+    basePath: '/api/users'
+    targets:
+      - 'http://localhost:3001'
+    authentication: true
+    loadBalancing: 'round-robin'
 ```
 
-## 📖 Documentation
+## Documentation
 
-Comprehensive documentation is available in the [docs](./docs) directory:
+- [Configuration Guide](docs/configuration.md)
+- [API Reference](docs/api.md)
+- [Deployment Guide](docs/deployment.md)
+- [Contributing](CONTRIBUTING.md)
 
-- [Installation Guide](./docs/installation.md)
-- [Configuration Guide](./docs/configuration.md)
-- [Deployment Guide](./docs/deployment.md)
-- [Authentication](./docs/auth.md)
-- [Response Transformation](./docs/transformation.md)
-- [Response Aggregation](./docs/aggregation.md)
-- [Monitoring](./docs/monitoring.md)
-- [Project Structure](./docs/project-structure.md)
+## License
 
-![Admin Dashboard](docs/images/admin-dashboard.png)
-
-## 🧪 Testing
-
-Run the test suite:
-
-```bash
-go test ./...
-```
-
-To run the API gateway test script:
-
-```bash
-cd test
-./test-api-gateway.sh
-```
-
-## 📦 Docker
-
-```bash
-# Build the docker image
-docker build -t odin-gateway:latest .
-
-# Run the container
-docker run -p 8080:8080 -p 8081:8081 -v $(pwd)/config:/app/config odin-gateway:latest
-```
-
-![Service Configuration](docs/images/admin-service-config.png)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please see our [Contributing Guide](./CONTRIBUTING.md) for more details.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
-
-## 🔗 Links
-
-- [Project Roadmap](./ROADMAP.md)
-- [Security Policy](./SECURITY.md)
-- [Code of Conduct](./CODE_OF_CONDUCT.md)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

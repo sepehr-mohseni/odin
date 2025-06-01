@@ -46,7 +46,6 @@ func loadAdminCredentials(logger *logrus.Logger) (*AdminCredentials, error) {
 				continue
 			}
 
-			logger.Infof("Loaded admin credentials from %s", path)
 			loaded = true
 			break
 		}

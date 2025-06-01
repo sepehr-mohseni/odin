@@ -39,7 +39,7 @@ func NewStore(config config.CacheConfig) (Store, error) {
 	switch config.Strategy {
 	case "local":
 		return &LocalStore{
-			cache: cache.New(config.TTL, time.Duration(config.TTL*2)),
+			cache: cache.New(config.TTL, config.TTL*2),
 		}, nil
 	case "redis":
 		opts, err := redis.ParseURL(config.RedisURL)

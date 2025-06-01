@@ -48,13 +48,6 @@ type TransformRule struct {
 	Default string `yaml:"default"`
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 type Registry struct {
 	services map[string]*Config
 	logger   *logrus.Logger

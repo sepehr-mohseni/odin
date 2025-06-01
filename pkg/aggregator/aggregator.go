@@ -178,146 +178,6 @@ func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *confi
 	}
 }
 
-func (a *Aggregator) fetchDependencyData(c echo.Context, dep config.DependencyConfig) (interface{}, error) {
-	targetURL := a.buildTargetURL(c, dep)
-
-	req, err := http.NewRequest("GET", targetURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	copyHeaders(c.Request(), req, dep.ParameterMapping)
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("dependency service returned status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var data interface{}
-	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, err
-	}
-
-	return a.mapResponseData(data, dep.ResultMapping), nil
-}
-
-func (a *Aggregator) buildTargetURL(c echo.Context, dep config.DependencyConfig) string {
-	// Build the target URL by replacing parameters in the path
-	targetURL := dep.Path
-
-	// If we have a service configuration, use its first target as base
-	if serviceConfig, exists := a.serviceConfigs[dep.Service]; exists && len(serviceConfig.Targets) > 0 {
-		baseURL := serviceConfig.Targets[0]
-		if !strings.HasSuffix(baseURL, "/") && !strings.HasPrefix(dep.Path, "/") {
-			targetURL = baseURL + "/" + dep.Path
-		} else {
-			targetURL = baseURL + dep.Path
-		}
-	}
-
-	// Replace parameters in the URL
-	for _, mapping := range dep.ParameterMapping {
-		paramName := strings.TrimPrefix(mapping.To, "{")
-		paramName = strings.TrimSuffix(paramName, "}")
-
-		// Get parameter value from request context or extract from original response
-		paramValue := c.QueryParam(paramName)
-		if paramValue == "" {
-			paramValue = c.Param(paramName)
-		}
-
-		if paramValue != "" {
-			targetURL = strings.ReplaceAll(targetURL, "{"+paramName+"}", paramValue)
-		}
-	}
-
-	return targetURL
-}
-
-func copyHeaders(srcReq *http.Request, destReq *http.Request, paramMappings []config.MappingConfig) {
-	// Copy relevant headers from source to destination request
-	headersToForward := []string{
-		"Authorization",
-		"Content-Type",
-		"Accept",
-		"User-Agent",
-		"X-Forwarded-For",
-		"X-Real-IP",
-	}
-
-	for _, header := range headersToForward {
-		if value := srcReq.Header.Get(header); value != "" {
-			destReq.Header.Set(header, value)
-		}
-	}
-
-	// Apply any header mappings from parameter mappings
-	for _, mapping := range paramMappings {
-		if strings.HasPrefix(mapping.From, "$.headers.") {
-			headerName := strings.TrimPrefix(mapping.From, "$.headers.")
-			if value := srcReq.Header.Get(headerName); value != "" {
-				destReq.Header.Set(mapping.To, value)
-			}
-		}
-	}
-}
-
-func (a *Aggregator) mapResponseData(data interface{}, mappings []config.MappingConfig) interface{} {
-	if len(mappings) == 0 {
-		return data
-	}
-
-	// Convert to map for easier manipulation
-	dataMap, ok := data.(map[string]interface{})
-	if !ok {
-		// If it's not a map, return as-is
-		return data
-	}
-
-	result := make(map[string]interface{})
-
-	// Apply each mapping
-	for _, mapping := range mappings {
-		fromPath := strings.TrimPrefix(mapping.From, "$.")
-		toPath := strings.TrimPrefix(mapping.To, "$.")
-
-		// If from path is root ($), copy entire object
-		if mapping.From == "$" {
-			if toPath == "" {
-				return dataMap
-			}
-			setNestedValue(result, strings.Split(toPath, "."), dataMap)
-		} else {
-			// Extract value from source path
-			value, found := getNestedValue(dataMap, strings.Split(fromPath, "."))
-			if found && value != nil {
-				if toPath == "" {
-					return value
-				}
-				setNestedValue(result, strings.Split(toPath, "."), value)
-			}
-		}
-	}
-
-	// If no mappings resulted in data, return original
-	if len(result) == 0 {
-		return dataMap
-	}
-
-	return result
-}
-
 func (a *Aggregator) EnrichResponse(ctx context.Context, serviceName string, responseBody []byte, headers http.Header, authToken string) ([]byte, error) {
 	serviceConfig, exists := a.serviceConfigs[serviceName]
 	if !exists || serviceConfig.Aggregation == nil {
@@ -419,4 +279,48 @@ func (a *Aggregator) fetchDependencyDataForEnrichment(ctx context.Context, dep c
 	}
 
 	return a.mapResponseData(data, dep.ResultMapping), nil
+}
+
+func (a *Aggregator) mapResponseData(data interface{}, mappings []config.MappingConfig) interface{} {
+	if len(mappings) == 0 {
+		return data
+	}
+
+	// Convert data to map for processing
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		return data
+	}
+
+	result := make(map[string]interface{})
+
+	// Apply mappings
+	for _, mapping := range mappings {
+		fromPath := strings.TrimPrefix(mapping.From, "$.")
+		toPath := strings.TrimPrefix(mapping.To, "$.")
+
+		// Extract value from source
+		if fromPath == "" || fromPath == "$" {
+			// Map entire object
+			if toPath == "" || toPath == "$" {
+				return dataMap
+			}
+			setNestedValue(result, strings.Split(toPath, "."), dataMap)
+		} else {
+			// Extract specific field
+			value, found := getNestedValue(dataMap, strings.Split(fromPath, "."))
+			if found {
+				if toPath == "" || toPath == "$" {
+					return value
+				}
+				setNestedValue(result, strings.Split(toPath, "."), value)
+			}
+		}
+	}
+
+	if len(result) == 0 {
+		return dataMap
+	}
+
+	return result
 }

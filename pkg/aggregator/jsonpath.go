@@ -299,66 +299,71 @@ func (a *Aggregator) setResultOnArrayItem(arrayItems []interface{}, index int, r
 	arrayItems[index] = item
 }
 
-func setNestedValue(data map[string]interface{}, path []string, value interface{}) {
-	if len(path) == 0 {
-		return
-	}
-
-	current := data
-	for i, part := range path {
-		if i == len(path)-1 {
-			current[part] = value
-			return
-		}
-
-		nextMap, ok := current[part].(map[string]interface{})
-		if !ok {
-			nextMap = make(map[string]interface{})
-			current[part] = nextMap
-		}
-		current = nextMap
-	}
-}
-
+// getNestedValue extracts a value from nested map using dot notation
 func getNestedValue(data map[string]interface{}, path []string) (interface{}, bool) {
-	if len(path) == 0 {
-		return nil, false
-	}
-
 	current := data
-	for i, part := range path {
+
+	for i, key := range path {
 		if i == len(path)-1 {
-			val, exists := current[part]
-			return val, exists
+			value, exists := current[key]
+			return value, exists
 		}
 
-		next, ok := current[part].(map[string]interface{})
-		if !ok {
-			nextAsInterface, exists := current[part]
-			if !exists {
-				return nil, false
-			}
-			next, ok = nextAsInterface.(map[string]interface{})
-			if !ok {
-				return nil, false
-			}
+		next, exists := current[key]
+		if !exists {
+			return nil, false
 		}
-		current = next
+
+		nextMap, ok := next.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+
+		current = nextMap
 	}
 
 	return nil, false
 }
 
-func parseArrayIndex(segment string) (int, bool) {
-	if !strings.HasPrefix(segment, "[") || !strings.HasSuffix(segment, "]") {
-		return 0, false
-	}
+// setNestedValue sets a value in nested map using dot notation
+func setNestedValue(data map[string]interface{}, path []string, value interface{}) {
+	current := data
 
-	indexStr := segment[1 : len(segment)-1]
-	index, err := strconv.Atoi(indexStr)
-	if err != nil {
-		return 0, false
-	}
+	for i, key := range path {
+		if i == len(path)-1 {
+			current[key] = value
+			return
+		}
 
-	return index, true
+		next, exists := current[key]
+		if !exists {
+			next = make(map[string]interface{})
+			current[key] = next
+		}
+
+		nextMap, ok := next.(map[string]interface{})
+		if !ok {
+			nextMap = make(map[string]interface{})
+			current[key] = nextMap
+		}
+
+		current = nextMap
+	}
+}
+
+// parseMaxAge parses max-age value from cache-control header
+func parseMaxAge(cacheControl string) (int, error) {
+	parts := strings.Split(cacheControl, ",")
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if strings.HasPrefix(part, "max-age=") {
+			ageStr := strings.TrimPrefix(part, "max-age=")
+			age, err := strconv.Atoi(ageStr)
+			if err != nil {
+				return 0, fmt.Errorf("invalid max-age value: %w", err)
+			}
+			return age, nil
+		}
+	}
+	return 0, fmt.Errorf("max-age not found in cache-control header")
 }
