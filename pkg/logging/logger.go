@@ -7,22 +7,31 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type Config struct {
+	Level  string `yaml:"level"`
+	Format string `yaml:"format"`
+	JSON   bool   `yaml:"json"`
+}
+
 func NewLogger() *logrus.Logger {
 	logger := logrus.New()
-	logger.SetFormatter(&logrus.JSONFormatter{})
 	logger.SetLevel(logrus.InfoLevel)
+	logger.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp: true,
+	})
 	return logger
 }
 
-func ConfigureLogger(logger *logrus.Logger, level string, jsonFormat bool) {
-	logLevel, err := logrus.ParseLevel(level)
+func ConfigureLogger(logger *logrus.Logger, config Config) {
+	// Set log level
+	level, err := logrus.ParseLevel(config.Level)
 	if err != nil {
-		logger.Warnf("Invalid log level '%s', defaulting to 'info'", level)
-		logLevel = logrus.InfoLevel
+		level = logrus.InfoLevel
 	}
-	logger.SetLevel(logLevel)
+	logger.SetLevel(level)
 
-	if jsonFormat {
+	// Set formatter
+	if config.JSON || config.Format == "json" {
 		logger.SetFormatter(&logrus.JSONFormatter{})
 	} else {
 		logger.SetFormatter(&logrus.TextFormatter{
@@ -61,4 +70,13 @@ func LoggerMiddleware(logger *logrus.Logger) echo.MiddlewareFunc {
 			return err
 		}
 	}
+}
+
+// Legacy function for backward compatibility
+func ConfigureLoggerLegacy(logger *logrus.Logger, level string, json bool) {
+	config := Config{
+		Level: level,
+		JSON:  json,
+	}
+	ConfigureLogger(logger, config)
 }

@@ -28,7 +28,11 @@ func main() {
 	logger := logging.NewLogger()
 
 	if envLogLevel := os.Getenv("LOG_LEVEL"); envLogLevel != "" {
-		logging.ConfigureLogger(logger, envLogLevel, false)
+		loggingConfig := logging.Config{
+			Level: envLogLevel,
+			JSON:  false,
+		}
+		logging.ConfigureLogger(logger, loggingConfig)
 	}
 
 	logger.Infof("Starting Odin API Gateway %s", version)
@@ -38,6 +42,13 @@ func main() {
 	if err != nil {
 		logger.Fatalf("Failed to load configuration: %v", err)
 	}
+
+	// Configure logging
+	loggingConfig := logging.Config{
+		Level: cfg.Logging.Level,
+		JSON:  cfg.Logging.JSON,
+	}
+	logging.ConfigureLogger(logger, loggingConfig)
 
 	// Apply environment variable overrides
 	if envPort := os.Getenv("GATEWAY_PORT"); envPort != "" {

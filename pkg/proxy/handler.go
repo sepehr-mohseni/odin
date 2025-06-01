@@ -2,14 +2,12 @@ package proxy
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
-	"odin/pkg/aggregator"
 	"odin/pkg/config"
 	"strings"
 	"sync"
@@ -19,67 +17,64 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// No need to seed the random number generator in Go 1.20+
-// The math/rand package is automatically initialized with a secure seed
+type Handler struct {
+	service      config.ServiceConfig
+	logger       *logrus.Logger
+	client       *http.Client
+	targets      []*url.URL
+	loadBalancer LoadBalancer
+}
 
-// LoadBalancer defines an interface for load balancing strategies
 type LoadBalancer interface {
 	NextTarget() *url.URL
 }
 
-// RoundRobinBalancer implements round-robin load balancing
 type RoundRobinBalancer struct {
 	targets []*url.URL
 	current int
 	mu      sync.Mutex
 }
 
-// RandomBalancer implements random target selection
 type RandomBalancer struct {
 	targets []*url.URL
 }
 
-// Handler manages HTTP request proxying to backend services
-type Handler struct {
-	service      config.ServiceConfig
-	targets      []*url.URL
-	logger       *logrus.Logger
-	client       *http.Client
-	loadBalancer LoadBalancer
-}
-
 // NewHandler creates a new proxy handler for a service
 func NewHandler(service config.ServiceConfig, logger *logrus.Logger) (echo.HandlerFunc, error) {
-	targets := make([]*url.URL, 0, len(service.Targets))
+	if len(service.Targets) == 0 {
+		return nil, fmt.Errorf("service %s has no targets", service.Name)
+	}
+
+	var targets []*url.URL
 	for _, target := range service.Targets {
-		u, err := url.Parse(target)
+		parsedURL, err := url.Parse(target)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid target URL %s: %w", target, err)
 		}
-		targets = append(targets, u)
-	}
 
-	client := &http.Client{
-		Timeout: service.Timeout,
-	}
+		// Additional validation for proper URL format
+		if parsedURL.Scheme == "" || parsedURL.Host == "" {
+			return nil, fmt.Errorf("invalid target URL %s: missing scheme or host", target)
+		}
 
-	// Create the appropriate load balancer based on the service configuration
-	var lb LoadBalancer
-	switch service.LoadBalancing {
-	case "round-robin":
-		lb = &RoundRobinBalancer{targets: targets}
-	case "random":
-		lb = &RandomBalancer{targets: targets}
-	default:
-		lb = &RoundRobinBalancer{targets: targets}
+		targets = append(targets, parsedURL)
 	}
 
 	handler := &Handler{
-		service:      service,
-		targets:      targets,
-		logger:       logger,
-		client:       client,
-		loadBalancer: lb,
+		service: service,
+		logger:  logger,
+		client: &http.Client{
+			Timeout: service.Timeout,
+		},
+		targets: targets,
+	}
+
+	// Initialize load balancer
+	switch service.LoadBalancing {
+	case "random":
+		handler.loadBalancer = &RandomBalancer{targets: targets}
+	default: // round-robin
+		handler.loadBalancer = &RoundRobinBalancer{targets: targets}
 	}
 
 	return handler.Handle, nil
@@ -87,254 +82,108 @@ func NewHandler(service config.ServiceConfig, logger *logrus.Logger) (echo.Handl
 
 // Handle processes HTTP requests and forwards them to backend services
 func (h *Handler) Handle(c echo.Context) error {
-	// Get target using the pre-configured load balancer
+	// Get target URL
 	targetURL := h.loadBalancer.NextTarget()
+	if targetURL == nil {
+		return echo.NewHTTPError(http.StatusServiceUnavailable, "No available targets")
+	}
 
-	reqPath := c.Request().URL.Path
-	h.logger.WithFields(logrus.Fields{
-		"service":       h.service.Name,
-		"reqPath":       reqPath,
-		"basePath":      h.service.BasePath,
-		"stripBase":     h.service.StripBasePath,
-		"original_path": c.Request().URL.Path,
-	}).Debug("Processing request path")
-
-	// Path handling
-	if h.service.StripBasePath {
-		if strings.HasPrefix(reqPath, h.service.BasePath) {
-			if reqPath == h.service.BasePath || reqPath == h.service.BasePath+"/" {
-				reqPath = "/"
-			} else {
-				reqPath = strings.TrimPrefix(reqPath, h.service.BasePath)
-				if !strings.HasPrefix(reqPath, "/") {
-					reqPath = "/" + reqPath
-				}
-			}
-			h.logger.WithField("modified_path", reqPath).Debug("Path after stripping base path")
+	// Build the request path
+	path := c.Request().URL.Path
+	if h.service.StripBasePath && strings.HasPrefix(path, h.service.BasePath) {
+		path = strings.TrimPrefix(path, h.service.BasePath)
+		if path == "" {
+			path = "/"
 		}
 	}
 
-	// Handle target URL path construction
-	targetURLCopy := *targetURL
-	if strings.HasSuffix(targetURLCopy.Path, "/") {
-		targetURLCopy.Path = targetURLCopy.Path + strings.TrimPrefix(reqPath, "/")
-	} else if !strings.HasSuffix(targetURLCopy.Path, "/") && !strings.HasPrefix(reqPath, "/") {
-		targetURLCopy.Path = targetURLCopy.Path + "/" + reqPath
-	} else {
-		targetURLCopy.Path = targetURLCopy.Path + reqPath
+	// Create target URL
+	target := fmt.Sprintf("%s%s", targetURL.String(), path)
+	if c.Request().URL.RawQuery != "" {
+		target += "?" + c.Request().URL.RawQuery
 	}
-
-	// Copy query parameters
-	targetURLCopy.RawQuery = c.Request().URL.RawQuery
 
 	h.logger.WithFields(logrus.Fields{
 		"service":       h.service.Name,
+		"target_url":    target,
 		"original_path": c.Request().URL.Path,
-		"target_url":    targetURLCopy.String(),
 	}).Info("Forwarding to target")
 
-	// Read request body if present
-	var reqBody []byte
-	var err error
+	// Create proxy request
+	var body io.Reader
 	if c.Request().Body != nil {
-		reqBody, err = io.ReadAll(c.Request().Body)
+		bodyBytes, err := io.ReadAll(c.Request().Body)
 		if err != nil {
-			h.logger.WithError(err).Error("Failed to read request body")
-			return echo.NewHTTPError(http.StatusInternalServerError, "Failed to read request body")
+			return echo.NewHTTPError(http.StatusBadRequest, "Failed to read request body")
 		}
-		c.Request().Body = io.NopCloser(bytes.NewReader(reqBody))
+		body = bytes.NewReader(bodyBytes)
 	}
 
-	// Apply request transformations if configured
-	if len(h.service.Transform.Request) > 0 && reqBody != nil {
-		var requestData map[string]interface{}
-		if err := json.Unmarshal(reqBody, &requestData); err == nil {
-			for _, rule := range h.service.Transform.Request {
-				applyTransformation(requestData, rule)
-			}
-			reqBody, _ = json.Marshal(requestData)
-		}
+	req, err := http.NewRequestWithContext(c.Request().Context(), c.Request().Method, target, body)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create proxy request")
 	}
 
-	// Set up retries
+	// Copy headers
+	for k, v := range c.Request().Header {
+		req.Header[k] = v
+	}
+
+	// Add custom headers
+	for k, v := range h.service.Headers {
+		req.Header.Set(k, v)
+	}
+
+	// Make request with retries
 	var resp *http.Response
 	var lastErr error
+
 	for attempt := 0; attempt <= h.service.RetryCount; attempt++ {
-		if attempt > 0 {
-			h.logger.WithFields(logrus.Fields{
-				"service": h.service.Name,
-				"attempt": attempt,
-				"url":     targetURLCopy.String(),
-			}).Debug("Retrying request")
+		resp, lastErr = h.client.Do(req)
+		if lastErr == nil && resp.StatusCode < 500 {
+			break
+		}
+		if attempt < h.service.RetryCount {
 			time.Sleep(h.service.RetryDelay)
-
-			// Get a new target for retry using the load balancer
-			targetURL = h.loadBalancer.NextTarget()
-			targetURLCopy.Host = targetURL.Host
-			targetURLCopy.Scheme = targetURL.Scheme
 		}
-
-		req, err := http.NewRequest(c.Request().Method, targetURLCopy.String(), bytes.NewReader(reqBody))
-		if err != nil {
-			lastErr = err
-			continue
-		}
-
-		// Copy headers from original request
-		for k, vals := range c.Request().Header {
-			for _, v := range vals {
-				req.Header.Add(k, v)
-			}
-		}
-
-		// Add service-specific headers
-		for k, v := range h.service.Headers {
-			req.Header.Set(k, v)
-		}
-
-		h.logger.WithFields(logrus.Fields{
-			"service":         h.service.Name,
-			"method":          req.Method,
-			"target_url":      req.URL.String(),
-			"strip_base_path": h.service.StripBasePath,
-			"original_path":   c.Request().URL.Path,
-		}).Debug("Forwarding request to target")
-
-		ctx, cancel := context.WithTimeout(c.Request().Context(), h.service.Timeout)
-		defer cancel()
-
-		req = req.WithContext(ctx)
-
-		resp, err = h.client.Do(req)
-		if err != nil {
-			lastErr = err
-			h.logger.WithError(err).WithFields(logrus.Fields{
-				"service": h.service.Name,
-				"url":     targetURLCopy.String(),
-			}).Error("Request failed")
-			continue
-		}
-
-		break
 	}
 
-	// Handle case where all retries failed
-	if resp == nil {
-		h.logger.WithError(lastErr).Error("All retry attempts failed")
-
-		acceptHeader := c.Request().Header.Get("Accept")
-		if strings.Contains(acceptHeader, "text/html") {
-			return echo.NewHTTPError(http.StatusBadGateway, "Service unavailable")
-		}
-
-		return c.JSON(http.StatusBadGateway, map[string]string{
-			"error": "Service unavailable",
-		})
+	if lastErr != nil {
+		return echo.NewHTTPError(http.StatusBadGateway, "Service unavailable")
 	}
-
 	defer resp.Body.Close()
 
-	// Read response body
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		h.logger.WithError(err).Error("Failed to read response body")
-		return echo.NewHTTPError(http.StatusInternalServerError, "Error reading response")
+	// Copy response headers
+	for k, v := range resp.Header {
+		c.Response().Header()[k] = v
 	}
 
-	h.logger.WithFields(logrus.Fields{
-		"service":        h.service.Name,
-		"status":         resp.StatusCode,
-		"content_type":   resp.Header.Get("Content-Type"),
-		"content_length": resp.ContentLength,
-	}).Debug("Received response from target")
-
-	contentType := resp.Header.Get("Content-Type")
-	isJSON := strings.Contains(contentType, "application/json") || isJSONContent(respBody)
-
-	// Apply response transformations if configured
-	if len(h.service.Transform.Response) > 0 && isJSON {
-		var responseData map[string]interface{}
-		if err := json.Unmarshal(respBody, &responseData); err == nil {
-			for _, rule := range h.service.Transform.Response {
-				applyTransformation(responseData, rule)
-			}
-			respBody, _ = json.Marshal(responseData)
-		}
-	}
-
-	// Handle response aggregation if configured
-	if isJSON && h.service.Aggregation != nil && len(h.service.Aggregation.Dependencies) > 0 {
-		if agg, ok := c.Get("aggregator").(*aggregator.Aggregator); ok {
-			authToken := ""
-			if authHeader := c.Request().Header.Get("Authorization"); authHeader != "" {
-				authToken = authHeader
-			}
-
-			h.logger.WithField("service", h.service.Name).Debug("Enriching response with aggregation")
-			enrichedBody, err := agg.EnrichResponse(c.Request().Context(), h.service.Name, respBody, resp.Header, authToken)
-			if err == nil {
-				respBody = enrichedBody
-				contentType = "application/json"
-			} else {
-				h.logger.WithError(err).Error("Failed to enrich response")
-			}
-		} else {
-			h.logger.Warn("Aggregator not found in context")
-		}
-	}
-
-	// Copy headers from upstream response
-	for k, vals := range resp.Header {
-		if strings.ToLower(k) != "content-type" {
-			for _, v := range vals {
-				c.Response().Header().Add(k, v)
-			}
-		}
-	}
-
-	// Set content type
-	if isJSON {
-		c.Response().Header().Set("Content-Type", "application/json; charset=utf-8")
-	} else {
-		if contentType == "" {
-			contentType = http.DetectContentType(respBody)
-		}
-		c.Response().Header().Set("Content-Type", contentType)
-	}
-
-	return c.Blob(resp.StatusCode, c.Response().Header().Get("Content-Type"), respBody)
+	// Copy response body
+	c.Response().WriteHeader(resp.StatusCode)
+	_, err = io.Copy(c.Response().Writer, resp.Body)
+	return err
 }
 
-// Helper function to detect JSON content
-func isJSONContent(data []byte) bool {
-	if len(data) == 0 {
-		return false
+// NextTarget returns the next target for round-robin balancing
+func (rr *RoundRobinBalancer) NextTarget() *url.URL {
+	rr.mu.Lock()
+	defer rr.mu.Unlock()
+
+	if len(rr.targets) == 0 {
+		return nil
 	}
 
-	i := 0
-	for i < len(data) && (data[i] == ' ' || data[i] == '\t' || data[i] == '\n' || data[i] == '\r') {
-		i++
-	}
-	if i >= len(data) {
-		return false
-	}
-
-	return data[i] == '{' || data[i] == '[' || data[i] == '"'
-}
-
-// Get next target using round-robin strategy
-func (b *RoundRobinBalancer) NextTarget() *url.URL {
-	b.mu.Lock()
-	defer b.mu.Unlock()
-
-	target := b.targets[b.current]
-	b.current = (b.current + 1) % len(b.targets)
+	target := rr.targets[rr.current]
+	rr.current = (rr.current + 1) % len(rr.targets)
 	return target
 }
 
-// Get next target using random strategy
-func (b *RandomBalancer) NextTarget() *url.URL {
-	return b.targets[rand.Intn(len(b.targets))]
+// NextTarget returns a random target
+func (rb *RandomBalancer) NextTarget() *url.URL {
+	if len(rb.targets) == 0 {
+		return nil
+	}
+	return rb.targets[rand.Intn(len(rb.targets))]
 }
 
 // Apply transformation rule to data

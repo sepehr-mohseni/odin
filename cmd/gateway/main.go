@@ -26,7 +26,12 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	logging.ConfigureLogger(log, cfg.Logging.Level, cfg.Logging.JSON)
+	// Configure logging
+	loggingConfig := logging.Config{
+		Level: cfg.Logging.Level,
+		JSON:  cfg.Logging.JSON,
+	}
+	logging.ConfigureLogger(log, loggingConfig)
 
 	for _, svc := range cfg.Services {
 		log.WithFields(logrus.Fields{

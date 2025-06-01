@@ -18,12 +18,17 @@ func TestLoad(t *testing.T) {
 	configContent := `
 server:
   port: 8080
+  readTimeout: 30s
+  writeTimeout: 30s
 
 services:
   - name: test-service
     basePath: /api/test
     targets:
       - http://localhost:8081
+    timeout: 30s
+    authentication: false
+    stripBasePath: true
 `
 
 	tmpFile, err := ioutil.TempFile("", "config-*.yaml")
@@ -38,8 +43,12 @@ services:
 	require.NoError(t, err)
 
 	assert.Equal(t, 8080, cfg.Server.Port)
+	assert.Equal(t, 30*time.Second, cfg.Server.ReadTimeout)
 	assert.Len(t, cfg.Services, 1)
 	assert.Equal(t, "test-service", cfg.Services[0].Name)
+	assert.Equal(t, "/api/test", cfg.Services[0].BasePath)
+	assert.Len(t, cfg.Services[0].Targets, 1)
+	assert.Equal(t, "http://localhost:8081", cfg.Services[0].Targets[0])
 }
 
 func TestLoadNonExistentFile(t *testing.T) {
@@ -58,6 +67,9 @@ func TestServiceDefaults(t *testing.T) {
 
 	assert.Equal(t, 30*time.Second, service.Timeout)
 	assert.False(t, service.Authentication)
+	assert.Equal(t, "round-robin", service.LoadBalancing)
+	assert.Equal(t, 3, service.RetryCount)
+	assert.Equal(t, time.Second, service.RetryDelay)
 }
 
 func TestBasicConfigValidation(t *testing.T) {
@@ -81,7 +93,7 @@ func TestBasicConfigValidation(t *testing.T) {
 	assert.Equal(t, "test", cfg.Services[0].Name)
 	assert.NotEmpty(t, cfg.Services[0].Targets)
 
-	// Test with invalid service (empty name)
+	// Test with empty service name
 	cfg.Services[0].Name = ""
 	assert.Empty(t, cfg.Services[0].Name, "Service name should be empty for validation test")
 }
@@ -123,4 +135,39 @@ func TestServiceConfigBasics(t *testing.T) {
 	assert.Equal(t, "test-service", service.Name)
 	assert.Equal(t, "/api/test", service.BasePath)
 	assert.Len(t, service.Targets, 1)
+	assert.Equal(t, 30*time.Second, service.Timeout)
+	assert.False(t, service.Authentication)
+}
+
+func TestConfigWithAuth(t *testing.T) {
+	configContent := `
+server:
+  port: 8080
+
+auth:
+  jwtSecret: "test-secret"
+  accessTokenTTL: 3600s
+  refreshTokenTTL: 86400s
+
+services:
+  - name: secure-service
+    basePath: /api/secure
+    targets:
+      - http://localhost:8081
+    authentication: true
+`
+
+	tmpFile, err := ioutil.TempFile("", "config-*.yaml")
+	require.NoError(t, err)
+	defer os.Remove(tmpFile.Name())
+
+	_, err = tmpFile.WriteString(configContent)
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	cfg, err := config.Load(tmpFile.Name(), logrus.New())
+	require.NoError(t, err)
+
+	assert.Equal(t, "test-secret", cfg.Auth.JWTSecret)
+	assert.True(t, cfg.Services[0].Authentication)
 }

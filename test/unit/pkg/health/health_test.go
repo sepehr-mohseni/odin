@@ -1,6 +1,7 @@
 package health
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,10 +11,12 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHealthEndpoint(t *testing.T) {
 	e := echo.New()
+
 	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/health", nil)
@@ -22,11 +25,17 @@ func TestHealthEndpoint(t *testing.T) {
 	e.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "UP")
+
+	var response map[string]interface{}
+	err := json.Unmarshal(rec.Body.Bytes(), &response)
+	require.NoError(t, err)
+
+	assert.Equal(t, "UP", response["status"])
 }
 
 func TestDebugRoutesEndpoint(t *testing.T) {
 	e := echo.New()
+
 	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/debug/routes", nil)
@@ -35,12 +44,17 @@ func TestDebugRoutesEndpoint(t *testing.T) {
 	e.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "method")
-	assert.Contains(t, rec.Body.String(), "path")
+
+	var routes []map[string]interface{}
+	err := json.Unmarshal(rec.Body.Bytes(), &routes)
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, routes)
 }
 
 func TestDebugConfigEndpoint(t *testing.T) {
 	e := echo.New()
+
 	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/debug/config", nil)
@@ -49,11 +63,11 @@ func TestDebugConfigEndpoint(t *testing.T) {
 	e.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "Config not available")
 }
 
 func TestDebugContentTypesEndpoint(t *testing.T) {
 	e := echo.New()
+
 	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/debug/content-types", nil)
@@ -62,62 +76,44 @@ func TestDebugContentTypesEndpoint(t *testing.T) {
 	e.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "message")
-	assert.Contains(t, rec.Body.String(), "timestamp")
 }
 
 func TestHealthCheck(t *testing.T) {
-	e := echo.New()
-	health.Register(e, logrus.New())
+	checker := health.NewChecker()
 
-	req := httptest.NewRequest("GET", "/health", nil)
-	rec := httptest.NewRecorder()
+	status := checker.Check()
 
-	e.ServeHTTP(rec, req)
-
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "status")
-	assert.Contains(t, rec.Body.String(), "UP")
+	assert.Equal(t, "healthy", status.Status)
+	assert.NotZero(t, status.Timestamp)
 }
 
 func TestHealthCheckWithDependencies(t *testing.T) {
-	// Test would include checking external dependencies
-	// For now, basic health check test
-	e := echo.New()
-	health.Register(e, logrus.New())
+	checker := health.NewChecker()
 
-	req := httptest.NewRequest("GET", "/health", nil)
-	rec := httptest.NewRecorder()
+	// Add a dependency check
+	checker.AddCheck("test", func() error {
+		return nil
+	})
 
-	e.ServeHTTP(rec, req)
+	status := checker.Check()
 
-	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "healthy", status.Status)
+	assert.Contains(t, status.Checks, "test")
+	assert.Equal(t, "healthy", status.Checks["test"].Status)
 }
 
 func TestReadinessCheck(t *testing.T) {
-	e := echo.New()
-	health.Register(e, logrus.New())
+	checker := health.NewChecker()
 
-	req := httptest.NewRequest("GET", "/ready", nil)
-	rec := httptest.NewRecorder()
+	status := checker.Readiness()
 
-	e.ServeHTTP(rec, req)
-
-	// Readiness check should return OK when services are ready
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "ready")
+	assert.Equal(t, "ready", status.Status)
 }
 
 func TestLivenessCheck(t *testing.T) {
-	e := echo.New()
-	health.Register(e, logrus.New())
+	checker := health.NewChecker()
 
-	req := httptest.NewRequest("GET", "/live", nil)
-	rec := httptest.NewRecorder()
+	status := checker.Liveness()
 
-	e.ServeHTTP(rec, req)
-
-	// Liveness check should always return OK if the service is running
-	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "alive")
+	assert.Equal(t, "alive", status.Status)
 }

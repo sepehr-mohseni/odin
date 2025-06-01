@@ -130,7 +130,7 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 		router:          router,
 	}
 
-	logging.ConfigureLogger(logger, cfg.Logging.Level, cfg.Logging.JSON)
+	logging.ConfigureLoggerLegacy(logger, cfg.Logging.Level, cfg.Logging.JSON)
 
 	health.Register(e, logger)
 

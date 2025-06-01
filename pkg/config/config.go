@@ -114,7 +114,7 @@ type MappingConfig struct {
 // SetDefaults sets default values for ServiceConfig
 func (s *ServiceConfig) SetDefaults() {
 	if s.LoadBalancing == "" {
-		s.LoadBalancing = "round_robin"
+		s.LoadBalancing = "round-robin"
 	}
 	if s.Timeout == 0 {
 		s.Timeout = 30 * time.Second

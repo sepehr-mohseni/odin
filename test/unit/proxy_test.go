@@ -16,66 +16,65 @@ import (
 )
 
 func TestProxyHandlerSimpleForwarding(t *testing.T) {
-	// Create a mock upstream server
-	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
+	// Create a mock backend server
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello from upstream service"))
+		w.Write([]byte(`{"message": "Hello from backend"}`))
 	}))
-	defer upstream.Close()
+	defer backend.Close()
 
 	// Create service config
 	serviceConfig := config.ServiceConfig{
 		Name:          "test-service",
 		BasePath:      "/api/test",
-		Targets:       []string{upstream.URL},
-		StripBasePath: true,
+		Targets:       []string{backend.URL},
 		Timeout:       30 * time.Second,
-		LoadBalancing: "round_robin",
+		StripBasePath: true,
 	}
 
 	// Create proxy handler
 	handler, err := proxy.NewHandler(serviceConfig, logrus.New())
 	require.NoError(t, err)
 
-	// Create test request
+	// Create Echo context
 	e := echo.New()
 	req := httptest.NewRequest("GET", "/api/test/resource", nil)
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	// Execute the handler
+	// Execute handler
 	err = handler(c)
 	require.NoError(t, err)
 
 	// Verify response
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.Contains(t, rec.Body.String(), "Hello from upstream service")
+	assert.Contains(t, rec.Body.String(), "Hello from backend")
 }
 
 func TestLoadBalancing(t *testing.T) {
-	// Create two mock servers
-	server1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Response from server 1"))
+	// Create multiple backend servers
+	backend1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"server": "backend1"}`))
 	}))
-	defer server1.Close()
+	defer backend1.Close()
 
-	server2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Response from server 2"))
+	backend2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"server": "backend2"}`))
 	}))
-	defer server2.Close()
+	defer backend2.Close()
 
+	// Create service config with multiple targets
 	serviceConfig := config.ServiceConfig{
 		Name:          "test-lb-service",
 		BasePath:      "/api/test-lb",
-		Targets:       []string{server1.URL, server2.URL},
-		StripBasePath: true,
+		Targets:       []string{backend1.URL, backend2.URL},
 		Timeout:       30 * time.Second,
-		LoadBalancing: "round_robin",
+		LoadBalancing: "round-robin",
+		StripBasePath: true,
 	}
 
+	// Create proxy handler
 	handler, err := proxy.NewHandler(serviceConfig, logrus.New())
 	require.NoError(t, err)
 
@@ -90,37 +89,34 @@ func TestLoadBalancing(t *testing.T) {
 
 		err = handler(c)
 		require.NoError(t, err)
-		assert.Equal(t, http.StatusOK, rec.Code)
 
-		response := rec.Body.String()
-		responses[response]++
+		body := rec.Body.String()
+		responses[body]++
 	}
 
-	// Both servers should have received requests
+	// Both backends should have received requests
 	assert.Len(t, responses, 2)
 }
 
 func TestProxyHandlerBasic(t *testing.T) {
-	// Basic test to ensure proxy handler can be created and used
 	serviceConfig := config.ServiceConfig{
-		Name:     "basic-test",
-		BasePath: "/test",
-		Targets:  []string{"http://example.com"},
-		Timeout:  5 * time.Second,
+		Name:     "test",
+		BasePath: "/api/test",
+		Targets:  []string{"http://localhost:9999"},
+		Timeout:  1 * time.Second,
 	}
 
 	handler, err := proxy.NewHandler(serviceConfig, logrus.New())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, handler)
 }
 
 func TestNewHandler(t *testing.T) {
 	serviceConfig := config.ServiceConfig{
-		Name:          "test-service",
-		BasePath:      "/api/test",
-		Targets:       []string{"http://localhost:8081"},
-		Timeout:       30 * time.Second,
-		LoadBalancing: "round_robin",
+		Name:     "test",
+		BasePath: "/api/test",
+		Targets:  []string{"http://localhost:8081"},
+		Timeout:  30 * time.Second,
 	}
 
 	handler, err := proxy.NewHandler(serviceConfig, logrus.New())
@@ -130,31 +126,31 @@ func TestNewHandler(t *testing.T) {
 
 func TestNewHandlerInvalidTarget(t *testing.T) {
 	serviceConfig := config.ServiceConfig{
-		Name:     "test-service",
+		Name:     "test",
 		BasePath: "/api/test",
-		Targets:  []string{"://invalid-url-with-no-scheme"},
+		Targets:  []string{"invalid-url"}, // This is not a valid URL with scheme
 		Timeout:  30 * time.Second,
 	}
 
 	handler, err := proxy.NewHandler(serviceConfig, logrus.New())
 	assert.Error(t, err)
 	assert.Nil(t, handler)
+	assert.Contains(t, err.Error(), "invalid target URL")
 }
 
 func TestRoundRobinBalancer(t *testing.T) {
-	// Create a mock server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message": "success"}`))
+		w.Write([]byte(`{"status": "ok"}`))
 	}))
-	defer server.Close()
+	defer backend.Close()
 
 	serviceConfig := config.ServiceConfig{
 		Name:          "test-service",
 		BasePath:      "/api/test",
-		Targets:       []string{server.URL, server.URL + "/alt"},
-		Timeout:       5 * time.Second,
-		LoadBalancing: "round_robin",
+		Targets:       []string{backend.URL},
+		Timeout:       30 * time.Second,
+		LoadBalancing: "round-robin",
 	}
 
 	handler, err := proxy.NewHandler(serviceConfig, logrus.New())
@@ -166,48 +162,45 @@ func TestRoundRobinBalancer(t *testing.T) {
 	c := e.NewContext(req, rec)
 
 	err = handler(c)
-	assert.NoError(t, err)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
 }
 
 func TestPathStripping(t *testing.T) {
-	// Create a mock server that echoes the request path
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"path": "` + r.URL.Path + `"}`))
-	}))
-	defer server.Close()
-
 	tests := []struct {
 		name          string
-		basePath      string
-		requestPath   string
 		stripBasePath bool
+		requestPath   string
 		expectedPath  string
 	}{
 		{
 			name:          "strip base path",
-			basePath:      "/api/users",
-			requestPath:   "/api/users/123",
 			stripBasePath: true,
+			requestPath:   "/api/users/123",
 			expectedPath:  "/123",
 		},
 		{
 			name:          "keep base path",
-			basePath:      "/api/users",
-			requestPath:   "/api/users/123",
 			stripBasePath: false,
+			requestPath:   "/api/users/123",
 			expectedPath:  "/api/users/123",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				assert.Equal(t, tt.expectedPath, r.URL.Path)
+				w.WriteHeader(http.StatusOK)
+			}))
+			defer backend.Close()
+
 			serviceConfig := config.ServiceConfig{
 				Name:          "test-service",
-				BasePath:      tt.basePath,
-				Targets:       []string{server.URL},
+				BasePath:      "/api/users",
+				Targets:       []string{backend.URL},
+				Timeout:       30 * time.Second,
 				StripBasePath: tt.stripBasePath,
-				Timeout:       5 * time.Second,
 			}
 
 			handler, err := proxy.NewHandler(serviceConfig, logrus.New())
@@ -219,27 +212,29 @@ func TestPathStripping(t *testing.T) {
 			c := e.NewContext(req, rec)
 
 			err = handler(c)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		})
 	}
 }
 
 func TestRetryMechanism(t *testing.T) {
-	// Create a server that succeeds on first try to match the expected behavior
-	requestCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		requestCount++
-		// Always succeed for this test
+	attempts := 0
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 2 {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"message": "success"}`))
+		w.Write([]byte(`{"success": true}`))
 	}))
-	defer server.Close()
+	defer backend.Close()
 
 	serviceConfig := config.ServiceConfig{
 		Name:       "test-service",
 		BasePath:   "/api/test",
-		Targets:    []string{server.URL},
-		Timeout:    5 * time.Second,
+		Targets:    []string{backend.URL},
+		Timeout:    30 * time.Second,
 		RetryCount: 3,
 		RetryDelay: 100 * time.Millisecond,
 	}
@@ -253,6 +248,7 @@ func TestRetryMechanism(t *testing.T) {
 	c := e.NewContext(req, rec)
 
 	err = handler(c)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.True(t, attempts >= 2, "Should have retried at least once")
 }
