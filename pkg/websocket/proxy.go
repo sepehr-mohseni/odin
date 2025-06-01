@@ -131,13 +131,15 @@ func (p *Proxy) ProxyWebSocket(c echo.Context, targetURL string) error {
 func (c *Connection) proxyClientToServer() {
 	defer c.close()
 
-	if err := c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+	err := c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+	if err != nil {
 		c.proxy.logger.WithError(err).Error("Failed to set read deadline on client connection")
 		return
 	}
 
 	c.clientConn.SetPongHandler(func(string) error {
-		if err := c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+		err := c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+		if err != nil {
 			c.proxy.logger.WithError(err).Error("Failed to set read deadline in pong handler")
 		}
 		return nil
@@ -172,13 +174,15 @@ func (c *Connection) proxyClientToServer() {
 func (c *Connection) proxyServerToClient() {
 	defer c.close()
 
-	if err := c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+	err := c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+	if err != nil {
 		c.proxy.logger.WithError(err).Error("Failed to set read deadline on server connection")
 		return
 	}
 
 	c.serverConn.SetPongHandler(func(string) error {
-		if err := c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+		err := c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+		if err != nil {
 			c.proxy.logger.WithError(err).Error("Failed to set read deadline in pong handler")
 		}
 		return nil

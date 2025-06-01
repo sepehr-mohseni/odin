@@ -124,19 +124,14 @@ func (h *ServiceHandler) createProxyRequest(c echo.Context, targetURL string) (*
 		body = bytes.NewReader(bodyBytes)
 	}
 
-	req, err := http.NewRequest(c.Request().Method, targetURL, body)
+	req, err := http.NewRequestWithContext(c.Request().Context(), c.Request().Method, targetURL, body)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	for k, vals := range c.Request().Header {
-		for _, v := range vals {
-			req.Header.Add(k, v)
-		}
-	}
-
-	for k, v := range h.service.Headers {
-		req.Header.Set(k, v)
+	// Copy headers
+	for k, v := range c.Request().Header {
+		req.Header[k] = v
 	}
 
 	return req, nil

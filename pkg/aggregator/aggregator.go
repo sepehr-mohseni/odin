@@ -1,7 +1,6 @@
 package aggregator
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -54,46 +53,57 @@ func (a *Aggregator) RegisterRoutes(e *echo.Echo) {
 }
 
 func (a *Aggregator) AggregateHandler(c echo.Context) error {
-	ctx := c.Request().Context()
-
 	// Get query parameters for services to aggregate
-	serviceNames := c.QueryParam("services")
-	if serviceNames == "" {
+	services := c.QueryParam("services")
+	if services == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "services parameter is required")
 	}
 
-	services := strings.Split(serviceNames, ",")
-	responses := make(map[string]*ServiceResponse)
+	serviceNames := strings.Split(services, ",")
+	var wg sync.WaitGroup
+	results := make(map[string]*ServiceResponse)
+	resultsMu := sync.Mutex{}
 
 	// Use sync.WaitGroup for concurrent requests
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-
-	for _, serviceName := range services {
+	for _, serviceName := range serviceNames {
 		serviceName = strings.TrimSpace(serviceName)
-		if serviceConfig, exists := a.serviceConfigs[serviceName]; exists {
-			wg.Add(1)
-			go func(svcName string, svcConfig *config.ServiceConfig) {
-				defer wg.Done()
-
-				response := a.callService(ctx, c, svcConfig)
-
-				mu.Lock()
-				responses[svcName] = response
-				mu.Unlock()
-			}(serviceName, &serviceConfig) // Fix: take address of serviceConfig
+		if serviceName == "" {
+			continue
 		}
+
+		wg.Add(1)
+		go func(svcName string) {
+			defer wg.Done()
+
+			svcConfig, exists := a.serviceConfigs[svcName]
+			if !exists {
+				resultsMu.Lock()
+				results[svcName] = &ServiceResponse{
+					Service: svcName,
+					Status:  http.StatusNotFound,
+					Error:   "Service not found",
+				}
+				resultsMu.Unlock()
+				return
+			}
+
+			response := a.callService(c.Request().Context(), c, &svcConfig)
+			resultsMu.Lock()
+			results[svcName] = response
+			resultsMu.Unlock()
+		}(serviceName)
 	}
 
 	wg.Wait()
 
 	// Build aggregated response
-	aggregatedResponse := map[string]interface{}{
-		"services":  responses,
-		"timestamp": time.Now().Unix(),
+	aggregateResponse := AggregateResponse{
+		Success:   true,
+		Timestamp: time.Now().Format(time.RFC3339),
+		Results:   results,
 	}
 
-	return c.JSON(http.StatusOK, aggregatedResponse)
+	return c.JSON(http.StatusOK, aggregateResponse)
 }
 
 func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *config.ServiceConfig) *ServiceResponse {
@@ -105,14 +115,12 @@ func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *confi
 		}
 	}
 
-	targetURL := svc.Targets[0]
-	endpoint := c.QueryParam("endpoint")
-	if endpoint == "" {
-		endpoint = "/"
+	targetURL := svc.Targets[0] + c.Request().URL.Path
+	if c.Request().URL.RawQuery != "" {
+		targetURL += "?" + c.Request().URL.RawQuery
 	}
-	url := targetURL + endpoint
 
-	req, err := http.NewRequestWithContext(ctx, c.Request().Method, url, nil)
+	req, err := http.NewRequestWithContext(ctx, c.Request().Method, targetURL, nil)
 	if err != nil {
 		return &ServiceResponse{
 			Service: svc.Name,
@@ -121,34 +129,17 @@ func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *confi
 		}
 	}
 
-	for k, vals := range c.Request().Header {
-		for _, v := range vals {
-			req.Header.Add(k, v)
-		}
+	// Copy headers
+	for k, v := range c.Request().Header {
+		req.Header[k] = v
 	}
 
-	for k, v := range svc.Headers {
-		req.Header.Set(k, v)
-	}
-
-	if (c.Request().Method == http.MethodPost || c.Request().Method == http.MethodPut) && c.Request().Body != nil {
-		bodyBytes, _ := io.ReadAll(c.Request().Body)
-		c.Request().Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		req.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		req.ContentLength = int64(len(bodyBytes))
-		req.Header.Set("Content-Type", c.Request().Header.Get("Content-Type"))
-	}
-
-	client := &http.Client{
-		Timeout: svc.Timeout,
-	}
-
-	resp, err := client.Do(req)
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return &ServiceResponse{
 			Service: svc.Name,
 			Status:  http.StatusServiceUnavailable,
-			Error:   "Request failed: " + err.Error(),
+			Error:   "Service call failed",
 		}
 	}
 	defer resp.Body.Close()
@@ -162,8 +153,8 @@ func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *confi
 		}
 	}
 
-	var respData map[string]interface{}
-	if err := json.Unmarshal(respBody, &respData); err != nil {
+	var data map[string]interface{}
+	if err := json.Unmarshal(respBody, &data); err != nil {
 		return &ServiceResponse{
 			Service: svc.Name,
 			Status:  resp.StatusCode,
@@ -174,7 +165,7 @@ func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *confi
 	return &ServiceResponse{
 		Service: svc.Name,
 		Status:  resp.StatusCode,
-		Data:    respData,
+		Data:    data,
 	}
 }
 

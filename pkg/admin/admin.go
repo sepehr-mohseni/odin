@@ -41,7 +41,8 @@ func loadAdminCredentials(logger *logrus.Logger) (*AdminCredentials, error) {
 				continue
 			}
 
-			if err := yaml.Unmarshal(data, &credentials); err != nil {
+			err = yaml.Unmarshal(data, &credentials)
+			if err != nil {
 				logger.WithError(err).Warnf("Failed to parse admin credentials file: %s", path)
 				continue
 			}
@@ -52,7 +53,6 @@ func loadAdminCredentials(logger *logrus.Logger) (*AdminCredentials, error) {
 	}
 
 	if !loaded {
-		logger.Warn("No admin credentials file found, will use credentials from main config")
 		return nil, nil
 	}
 
