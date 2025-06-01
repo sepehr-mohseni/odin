@@ -73,7 +73,6 @@ var (
 
 func Register(e *echo.Echo, path string) {
 	e.GET(path, echo.WrapHandler(promhttp.Handler()))
-
 	e.Use(MetricsMiddleware)
 }
 

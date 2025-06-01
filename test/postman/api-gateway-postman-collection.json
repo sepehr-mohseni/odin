@@ -41,109 +41,57 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{users_url}}/api/users/usr-001",
+                                    "raw": "{{users_url}}/api/users/{{user_id}}",
                                     "host": [
                                         "{{users_url}}"
                                     ],
                                     "path": [
                                         "api",
                                         "users",
-                                        "usr-001"
-                                    ]
-                                },
-                                "description": "Get a specific user by ID (requires authentication)"
-                            }
-                        },
-                        {
-                            "name": "Create User",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "value": "Bearer {{token}}",
-                                        "type": "text"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json",
-                                        "type": "text"
-                                    }
-                                ],
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n  \"username\": \"new_user\",\n  \"email\": \"new@example.com\",\n  \"name\": \"New User\"\n}"
-                                },
-                                "url": {
-                                    "raw": "{{users_url}}/api/users",
-                                    "host": [
-                                        "{{users_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "users"
-                                    ]
-                                },
-                                "description": "Create a new user (requires authentication)"
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "Products Service",
-                    "item": [
-                        {
-                            "name": "Get All Products",
-                            "request": {
-                                "method": "GET",
-                                "url": {
-                                    "raw": "{{products_url}}/api/products",
-                                    "host": [
-                                        "{{products_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "products"
+                                        "{{user_id}}"
                                     ]
                                 }
                             }
                         }
                     ]
-                }
-            ]
-        },
-        {
-            "name": "Gateway Tests",
-            "item": [
-                {
-                    "name": "Gateway Health",
-                    "request": {
-                        "method": "GET",
-                        "url": {
-                            "raw": "{{gateway_url}}/health",
-                            "host": [
-                                "{{gateway_url}}"
-                            ],
-                            "path": [
-                                "health"
-                            ]
-                        }
-                    }
                 },
                 {
-                    "name": "Gateway Metrics",
-                    "request": {
-                        "method": "GET",
-                        "url": {
-                            "raw": "{{gateway_url}}/metrics",
-                            "host": [
-                                "{{gateway_url}}"
-                            ],
-                            "path": [
-                                "metrics"
-                            ]
+                    "name": "Gateway Tests",
+                    "item": [
+                        {
+                            "name": "Health Check",
+                            "request": {
+                                "method": "GET",
+                                "url": "{{gateway_url}}/health"
+                            }
+                        },
+                        {
+                            "name": "Admin Login",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/x-www-form-urlencoded"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "urlencoded",
+                                    "urlencoded": [
+                                        {
+                                            "key": "username",
+                                            "value": "{{admin_username}}"
+                                        },
+                                        {
+                                            "key": "password",
+                                            "value": "{{admin_password}}"
+                                        }
+                                    ]
+                                },
+                                "url": "{{gateway_url}}/admin/login"
+                            }
                         }
-                    }
+                    ]
                 }
             ]
         }
@@ -158,20 +106,20 @@
             "value": "http://localhost:8081"
         },
         {
-            "key": "products_url",
-            "value": "http://localhost:8083"
+            "key": "admin_username",
+            "value": "admin"
         },
         {
-            "key": "orders_url",
-            "value": "http://localhost:8084"
-        },
-        {
-            "key": "categories_url",
-            "value": "http://localhost:8085"
+            "key": "admin_password",
+            "value": "admin123"
         },
         {
             "key": "token",
-            "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoidXNyLTAwMSIsInVzZXJuYW1lIjoiam9obl9kb2UiLCJyb2xlIjoidXNlciIsImV4cCI6MTcxOTQ2MzkyOSwiaWF0IjoxNzE5NDYwMzI5fQ.WD6nbfa0K9VkFLEF9pWYZXQweQSU0IF6oKkdNULMpqE"
+            "value": ""
+        },
+        {
+            "key": "user_id",
+            "value": "user-1"
         }
     ]
 }

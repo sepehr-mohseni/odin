@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"crypto/sha256"
-	"encoding/hex" // Added missing import for fmt
+	"encoding/hex"
 	"io"
 	"net/http"
 	"odin/pkg/cache"
@@ -48,18 +48,20 @@ func CacheMiddleware(store cache.Store, logger *logrus.Logger) echo.MiddlewareFu
 
 			key := generateCacheKey(c)
 
-			if cachedResp, found := store.Get(key); found {
-				logger.WithFields(logrus.Fields{
-					"uri": req.RequestURI,
-					"key": key,
-				}).Debug("Cache hit")
+			if cachedData, found := store.Get(key); found {
+				if cacheEntry, ok := cachedData.(*cache.CacheEntry); ok {
+					logger.WithFields(logrus.Fields{
+						"uri": req.RequestURI,
+						"key": key,
+					}).Debug("Cache hit")
 
-				for k, v := range cachedResp.Headers {
-					c.Response().Header().Set(k, v[0])
+					for k, v := range cacheEntry.Headers {
+						c.Response().Header().Set(k, v)
+					}
+					c.Response().WriteHeader(cacheEntry.StatusCode)
+					_, err := c.Response().Write(cacheEntry.Data)
+					return err
 				}
-				c.Response().WriteHeader(cachedResp.StatusCode)
-				_, err := c.Response().Write(cachedResp.Body)
-				return err
 			}
 
 			resWriter := &responseWriterWrapper{
@@ -73,12 +75,19 @@ func CacheMiddleware(store cache.Store, logger *logrus.Logger) echo.MiddlewareFu
 			err := next(c)
 
 			if err == nil {
-				cachedResp := &cache.CachedResponse{
-					Headers:    resWriter.headers,
+				cacheEntry := &cache.CacheEntry{
+					Headers:    make(map[string]string),
 					StatusCode: resWriter.statusCode,
-					Body:       []byte(resWriter.body.String()),
+					Data:       []byte(resWriter.body.String()),
 				}
-				store.Set(key, cachedResp)
+
+				for k, v := range resWriter.headers {
+					if len(v) > 0 {
+						cacheEntry.Headers[k] = v[0]
+					}
+				}
+
+				store.Set(key, cacheEntry, 0) // TTL handled by store
 
 				logger.WithFields(logrus.Fields{
 					"uri": req.RequestURI,

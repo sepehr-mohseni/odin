@@ -10,21 +10,6 @@
       rel="stylesheet"
     />
     <script src="https://unpkg.com/htmx.org@1.9.11"></script>
-    <style>
-      body {
-        padding-top: 20px;
-        padding-bottom: 40px;
-      }
-      .nav-link.active {
-        font-weight: bold;
-      }
-      .container {
-        max-width: 1200px;
-      }
-      .form-group {
-        margin-bottom: 1rem;
-      }
-    </style>
   </head>
   <body>
     <div class="container">
@@ -63,120 +48,123 @@
             hx-target="#form-messages"
             hx-swap="innerHTML"
           >
-            <div class="form-group">
-              <label for="name">Service Name</label>
-              <input
-                type="text"
-                class="form-control"
-                id="name"
-                name="name"
-                required
-              />
-            </div>
-
-            <div class="row mt-3">
-              <div class="col-md-6">
-                <div class="form-group">
-                  <label for="basePath">Base Path</label>
+            <div class="card mb-4">
+              <div class="card-header">
+                <h5>Service Configuration</h5>
+              </div>
+              <div class="card-body">
+                <div class="form-group mb-3">
+                  <label for="name">Service Name</label>
                   <input
                     type="text"
                     class="form-control"
-                    id="basePath"
-                    name="basePath"
+                    id="name"
+                    name="name"
                     required
                   />
                 </div>
-              </div>
 
-              <div class="col-md-6">
-                <div class="form-group">
-                  <label for="stripBasePath">Strip Base Path</label>
+                <div class="row mt-3">
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label for="basePath">Base Path</label>
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="basePath"
+                        name="basePath"
+                        placeholder="/api/service"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div class="col-md-6">
+                    <div class="form-group">
+                      <label for="stripBasePath">Strip Base Path</label>
+                      <select
+                        class="form-control"
+                        id="stripBasePath"
+                        name="stripBasePath"
+                      >
+                        <option value="true">Yes</option>
+                        <option value="false" selected>No</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group mt-3">
+                  <label for="targets">Targets (one per line)</label>
+                  <textarea
+                    class="form-control"
+                    id="targets"
+                    name="targets"
+                    rows="3"
+                    placeholder="http://service1:8081&#10;http://service2:8081"
+                    required
+                  ></textarea>
+                </div>
+
+                <div class="row mt-3">
+                  <div class="col-md-4">
+                    <div class="form-group">
+                      <label for="timeout">Timeout (seconds)</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="timeout"
+                        name="timeout"
+                        value="5"
+                        min="1"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div class="col-md-4">
+                    <div class="form-group">
+                      <label for="retryCount">Retry Count</label>
+                      <input
+                        type="number"
+                        class="form-control"
+                        id="retryCount"
+                        name="retryCount"
+                        value="1"
+                        min="0"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div class="col-md-4">
+                    <div class="form-group">
+                      <label for="authentication">Authentication</label>
+                      <select
+                        class="form-control"
+                        id="authentication"
+                        name="authentication"
+                      >
+                        <option value="true">Required</option>
+                        <option value="false" selected>Not Required</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="form-group mt-3">
+                  <label for="loadBalancing">Load Balancing Strategy</label>
                   <select
                     class="form-control"
-                    id="stripBasePath"
-                    name="stripBasePath"
+                    id="loadBalancing"
+                    name="loadBalancing"
                   >
-                    <option value="true">Yes</option>
-                    <option value="false" selected>No</option>
+                    <option value="round-robin" selected>Round Robin</option>
+                    <option value="random">Random</option>
+                    <option value="weighted">Weighted</option>
                   </select>
                 </div>
               </div>
-            </div>
-
-            <div class="form-group mt-3">
-              <label for="targets">Targets (one per line)</label>
-              <textarea
-                class="form-control"
-                id="targets"
-                name="targets"
-                rows="3"
-                required
-              ></textarea>
-            </div>
-
-            <div class="row mt-3">
-              <div class="col-md-4">
-                <div class="form-group">
-                  <label for="timeout">Timeout (seconds)</label>
-                  <input
-                    type="number"
-                    class="form-control"
-                    id="timeout"
-                    name="timeout"
-                    value="5"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <div class="form-group">
-                  <label for="retryCount">Retry Count</label>
-                  <input
-                    type="number"
-                    class="form-control"
-                    id="retryCount"
-                    name="retryCount"
-                    value="1"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div class="col-md-4">
-                <div class="form-group">
-                  <label for="authentication">Authentication</label>
-                  <select
-                    class="form-control"
-                    id="authentication"
-                    name="authentication"
-                  >
-                    <option value="true">Required</option>
-                    <option value="false">Not Required</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div class="form-group mt-3">
-              <label for="loadBalancing">Load Balancing Strategy</label>
-              <select
-                class="form-control"
-                id="loadBalancing"
-                name="loadBalancing"
-              >
-                <option value="round-robin" selected>Round Robin</option>
-                <option value="random">Random</option>
-              </select>
-            </div>
-
-            <div class="form-group mt-3">
-              <label for="aggregation">Aggregation</label>
-              <select class="form-control" id="aggregation" name="aggregation">
-                <option value="none" selected>None</option>
-                <option value="json">JSON</option>
-                <option value="xml">XML</option>
-              </select>
             </div>
 
             <div class="mt-4">
@@ -191,7 +179,7 @@
         <div class="row">
           <div class="col-12 col-md text-center">
             <small class="d-block mb-3 text-muted"
-              >&copy; 2025-∞ Odin API Gateway - Sepehr Mohseni</small
+              >&copy; 2025 Odin API Gateway</small
             >
           </div>
         </div>
@@ -200,7 +188,7 @@
 
     <script>
       document.addEventListener('htmx:afterSwap', function (event) {
-        var redirectTo = event.detail.xhr.getResponseHeader('HX-Redirect');
+        const redirectTo = event.detail.xhr.getResponseHeader('HX-Redirect');
         if (redirectTo) {
           window.location.href = redirectTo;
         }

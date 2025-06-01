@@ -2,11 +2,15 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Copy package.json and install dependencies
 COPY package*.json ./
-RUN npm install
+RUN npm install --only=production
 
+# Copy all service files
 COPY . .
 
-EXPOSE 8081 8083 8084 8085
+# Expose common ports for test services
+EXPOSE 8081 8082 8083 8084 8085
 
-CMD ["npm", "run", "start:all"]
+# Default command (can be overridden)
+CMD ["npm", "start"]

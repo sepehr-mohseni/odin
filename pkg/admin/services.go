@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"net/http"
 	"odin/pkg/config"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/labstack/echo/v4"
+	"github.com/sirupsen/logrus"
 )
 
 func (h *AdminHandler) handleListServices(c echo.Context) error {
@@ -134,9 +136,9 @@ func (h *AdminHandler) handleAddService(c echo.Context) error {
 		Authentication: c.FormValue("authentication") == "true",
 		LoadBalancing:  c.FormValue("loadBalancing"),
 		Aggregation:    aggregationConfig,
-		RetryCount: 1,
-		RetryDelay: 100 * time.Millisecond,
-		Timeout:    5 * time.Second,
+		RetryCount:     1,
+		RetryDelay:     100 * time.Millisecond,
+		Timeout:        5 * time.Second,
 	}
 
 	h.config.Services = append(h.config.Services, newSvc)
@@ -173,25 +175,40 @@ func (h *AdminHandler) handleUpdateService(c echo.Context) error {
 		return c.HTML(http.StatusBadRequest, `<div class="alert alert-danger">At least one target URL is required</div>`)
 	}
 
+	// Parse timeout
+	timeoutStr := c.FormValue("timeout")
+	timeout, err := strconv.Atoi(timeoutStr)
+	if err != nil || timeout <= 0 {
+		return c.HTML(http.StatusBadRequest, `<div class="alert alert-danger">Invalid timeout value</div>`)
+	}
+
+	// Parse retry count
+	retryCountStr := c.FormValue("retryCount")
+	retryCount, err := strconv.Atoi(retryCountStr)
+	if err != nil || retryCount < 0 {
+		return c.HTML(http.StatusBadRequest, `<div class="alert alert-danger">Invalid retry count value</div>`)
+	}
+
+	// Update service configuration
 	h.config.Services[svcIndex].BasePath = c.FormValue("basePath")
 	h.config.Services[svcIndex].Targets = targets
 	h.config.Services[svcIndex].StripBasePath = c.FormValue("stripBasePath") == "true"
 	h.config.Services[svcIndex].Authentication = c.FormValue("authentication") == "true"
 	h.config.Services[svcIndex].LoadBalancing = c.FormValue("loadBalancing")
+	h.config.Services[svcIndex].Timeout = time.Duration(timeout) * time.Second
+	h.config.Services[svcIndex].RetryCount = retryCount
 
-	enableAggregation := c.FormValue("enableAggregation") == "on"
-	if enableAggregation {
-		aggregationConfig := parseAggregationConfig(c, enableAggregation)
-		h.config.Services[svcIndex].Aggregation = aggregationConfig
-	} else {
-		h.config.Services[svcIndex].Aggregation = nil
-	}
-
+	// Save configuration
 	if err := h.saveConfig(); err != nil {
-		return c.HTML(http.StatusInternalServerError, `<div class="alert alert-danger">Failed to save configuration: `+err.Error()+`</div>`)
+		return c.HTML(http.StatusInternalServerError, `<div class="alert alert-danger">Failed to save configuration</div>`)
 	}
 
-	return c.HTML(http.StatusOK, `<div class="alert alert-success">Service updated successfully!</div>`)
+	h.logger.WithFields(logrus.Fields{
+		"service": name,
+		"action":  "update",
+	}).Info("Service updated")
+
+	return c.HTML(http.StatusOK, `<div class="alert alert-success">Service updated successfully</div>`)
 }
 
 func (h *AdminHandler) handleDeleteService(c echo.Context) error {
@@ -217,10 +234,10 @@ func (h *AdminHandler) handleDeleteService(c echo.Context) error {
 	return h.handleListServices(c)
 }
 
-
 func parseMultilineInput(input string) []string {
-	result := []string{}
-	for _, line := range strings.Split(input, "\n") {
+	lines := strings.Split(input, "\n")
+	var result []string
+	for _, line := range lines {
 		line = strings.TrimSpace(line)
 		if line != "" {
 			result = append(result, line)

@@ -18,7 +18,7 @@ func TestProxyHandlerSimpleForwarding(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(`{"message":"Hello from target"}`))
 		if err != nil {
-			t.Fatalf("Failed to write response: %v", err)
+			t.Errorf("Failed to write response: %v", err)
 		}
 	}))
 	defer targetServer.Close()
@@ -73,7 +73,7 @@ func TestLoadBalancing(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(`{"server":"target1"}`))
 		if err != nil {
-			t.Fatalf("Failed to write response: %v", err)
+			t.Errorf("Failed to write response: %v", err)
 		}
 	}))
 	defer target1.Close()
@@ -84,7 +84,7 @@ func TestLoadBalancing(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 		_, err := w.Write([]byte(`{"server":"target2"}`))
 		if err != nil {
-			t.Fatalf("Failed to write response: %v", err)
+			t.Errorf("Failed to write response: %v", err)
 		}
 	}))
 	defer target2.Close()
@@ -120,13 +120,13 @@ func TestLoadBalancing(t *testing.T) {
 		c.SetPath("/api/test-lb/resource")
 
 		if err := handler(c); err != nil {
-			t.Fatalf("Handler returned error: %v", err)
+			t.Errorf("Handler returned error on request %d: %v", i, err)
 		}
 	}
 
 	// With round-robin, we should have 2 hits per target
 	if target1Hits != 2 || target2Hits != 2 {
-		t.Errorf("Round-robin not working correctly. Target1: %d hits, Target2: %d hits", target1Hits, target2Hits)
+		t.Errorf("Expected 2 hits per target, got target1: %d, target2: %d", target1Hits, target2Hits)
 	}
 }
 
@@ -137,7 +137,7 @@ func TestProxyHandlerBasic(t *testing.T) {
 	// Fix line 19
 	_, err := w.Write([]byte("test response"))
 	if err != nil {
-		t.Fatalf("Failed to write response: %v", err)
+		t.Errorf("Failed to write test response: %v", err)
 	}
 
 	// More test code...
@@ -145,7 +145,7 @@ func TestProxyHandlerBasic(t *testing.T) {
 	// Fix line 71
 	_, err = w.Write([]byte("another test response"))
 	if err != nil {
-		t.Fatalf("Failed to write response: %v", err)
+		t.Errorf("Failed to write another test response: %v", err)
 	}
 
 	// More test code...
@@ -153,6 +153,6 @@ func TestProxyHandlerBasic(t *testing.T) {
 	// Fix line 79
 	_, err = w.Write([]byte("final test response"))
 	if err != nil {
-		t.Fatalf("Failed to write response: %v", err)
+		t.Errorf("Failed to write final test response: %v", err)
 	}
 }

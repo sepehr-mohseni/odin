@@ -19,8 +19,8 @@ type CachedResponse struct {
 }
 
 type Store interface {
-	Get(key string) (*CachedResponse, bool)
-	Set(key string, value *CachedResponse)
+	Get(key string) (interface{}, bool)
+	Set(key string, value interface{}, ttl time.Duration)
 	Delete(key string)
 	Clear()
 	Close() error
@@ -59,14 +59,14 @@ func NewStore(config config.CacheConfig) (Store, error) {
 	}
 }
 
-func (s *LocalStore) Get(key string) (*CachedResponse, bool) {
+func (s *LocalStore) Get(key string) (interface{}, bool) {
 	if value, found := s.cache.Get(key); found {
-		return value.(*CachedResponse), true
+		return value, true
 	}
 	return nil, false
 }
 
-func (s *LocalStore) Set(key string, value *CachedResponse) {
+func (s *LocalStore) Set(key string, value interface{}, ttl time.Duration) {
 	s.cache.Set(key, value, cache.DefaultExpiration)
 }
 
@@ -82,7 +82,7 @@ func (s *LocalStore) Close() error {
 	return nil
 }
 
-func (s *RedisStore) Get(key string) (*CachedResponse, bool) {
+func (s *RedisStore) Get(key string) (interface{}, bool) {
 	ctx := context.Background()
 	data, err := s.client.Get(ctx, key).Bytes()
 	if err != nil {
@@ -97,14 +97,18 @@ func (s *RedisStore) Get(key string) (*CachedResponse, bool) {
 	return &response, true
 }
 
-func (s *RedisStore) Set(key string, value *CachedResponse) {
+func (s *RedisStore) Set(key string, value interface{}, ttl time.Duration) {
 	ctx := context.Background()
 	data, err := json.Marshal(value)
 	if err != nil {
 		return
 	}
 
-	s.client.Set(ctx, key, data, s.ttl)
+	if ttl > 0 {
+		s.client.Set(ctx, key, data, ttl)
+	} else {
+		s.client.Set(ctx, key, data, s.ttl)
+	}
 }
 
 func (s *RedisStore) Delete(key string) {

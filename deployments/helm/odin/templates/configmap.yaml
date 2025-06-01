@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "odin.fullname" . }}-config
+  labels:
+    {{- include "odin.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    gateway:
+      port: {{ .Values.config.gateway.port }}
+      readTimeout: {{ .Values.config.gateway.readTimeout }}
+      writeTimeout: {{ .Values.config.gateway.writeTimeout }}
+      idleTimeout: {{ .Values.config.gateway.idleTimeout }}
+    
+    admin:
+      enabled: {{ .Values.config.admin.enabled }}
+      port: {{ .Values.config.admin.port }}
+      username: {{ .Values.config.admin.username }}
+      password: {{ .Values.config.admin.password }}
+    
+    auth:
+      accessTokenTTL: {{ .Values.config.auth.accessTokenTTL }}
+      refreshTokenTTL: {{ .Values.config.auth.refreshTokenTTL }}
+      {{- if .Values.config.auth.oauth2.enabled }}
+      oauth2:
+        enabled: true
+        providers:
+          {{- toYaml .Values.config.auth.oauth2.providers | nindent 10 }}
+      {{- end }}
+    
+    circuitBreaker:
+      maxRequests: {{ .Values.config.circuitBreaker.maxRequests }}
+      interval: {{ .Values.config.circuitBreaker.interval }}
+      timeout: {{ .Values.config.circuitBreaker.timeout }}
+      failureRatio: {{ .Values.config.circuitBreaker.failureRatio }}
+      minRequests: {{ .Values.config.circuitBreaker.minRequests }}
+    
+    {{- if .Values.config.websocket.enabled }}
+    websocket:
+      enabled: true
+      readBufferSize: {{ .Values.config.websocket.readBufferSize }}
+      writeBufferSize: {{ .Values.config.websocket.writeBufferSize }}
+      handshakeTimeout: {{ .Values.config.websocket.handshakeTimeout }}
+      readTimeout: {{ .Values.config.websocket.readTimeout }}
+      writeTimeout: {{ .Values.config.websocket.writeTimeout }}
+      pingPeriod: {{ .Values.config.websocket.pingPeriod }}
+      maxMessageSize: {{ .Values.config.websocket.maxMessageSize }}
+      enableCompression: {{ .Values.config.websocket.enableCompression }}
+    {{- end }}
+    
+    logging:
+      level: {{ .Values.config.logging.level }}
+      format: {{ .Values.config.logging.format }}
+  
+  services.yaml: |
+    services:
+      {{- toYaml .Values.services | nindent 6 }}

@@ -145,3 +145,6 @@ dist
 
 # Security files
 auth_secrets.yaml
+*.key
+*.pem
+*.cert

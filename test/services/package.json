@@ -1,18 +1,29 @@
 {
     "name": "odin-test-services",
     "version": "1.0.0",
-    "description": "Test microservices for Odin API Gateway",
+    "description": "Mock services for testing Odin API Gateway",
+    "main": "index.js",
     "scripts": {
-        "start:users": "node users-service/server.js",
-        "start:products": "node products-service/server.js",
-        "start:orders": "node orders-service/server.js",
-        "start:categories": "node categories-service/server.js",
-        "start:all": "concurrently \"npm run start:users\" \"npm run start:products\" \"npm run start:orders\" \"npm run start:categories\""
+        "start": "node index.js",
+        "users": "node users-service/server.js",
+        "products": "node products-service/server.js",
+        "orders": "node orders-service/server.js",
+        "categories": "node categories-service/server.js"
     },
     "dependencies": {
         "express": "^4.18.2",
-        "body-parser": "^1.20.2"
+        "cors": "^2.8.5",
+        "morgan": "^1.10.0",
+        "helmet": "^7.0.0"
     },
+    "keywords": [
+        "api",
+        "gateway",
+        "test",
+        "mock"
+    ],
+    "author": "Odin Team",
+    "license": "MIT",
     "devDependencies": {
         "concurrently": "^8.2.0"
     },

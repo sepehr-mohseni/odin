@@ -1,26 +1,42 @@
 const express = require('express');
-const bodyParser = require('body-parser');
+const cors = require('cors');
+const morgan = require('morgan');
+
 const app = express();
-const PORT = 8085;
+const PORT = process.env.PORT || 8085;
 
-app.use(bodyParser.json());
+// Middleware
+app.use(cors());
+app.use(morgan('combined'));
+app.use(express.json());
 
-const categories = {
-    'cat-001': { id: 'cat-001', name: 'Electronics', description: 'Electronic devices and gadgets' },
-    'cat-002': { id: 'cat-002', name: 'Accessories', description: 'Product accessories' },
-    'cat-003': { id: 'cat-003', name: 'Software', description: 'Software products and services' }
+// Mock data
+let categories = {
+    'cat-1': { id: 'cat-1', name: 'Electronics', description: 'Electronic devices and accessories' },
+    'cat-2': { id: 'cat-2', name: 'Clothing', description: 'Fashion and apparel' },
+    'cat-3': { id: 'cat-3', name: 'Books', description: 'Books and educational materials' }
 };
 
-const authenticate = (req, res, next) => {
+// Authentication middleware (mock)
+function authenticate(req, res, next) {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Authentication required' });
     }
     next();
-};
+}
+
+// Routes
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok', service: 'categories', timestamp: new Date().toISOString() });
+});
 
 app.get('/api/categories', (req, res) => {
-    res.json({ data: Object.values(categories) });
+    const categoriesList = Object.values(categories);
+    res.json({
+        categories: categoriesList,
+        total: categoriesList.length
+    });
 });
 
 app.get('/api/categories/:id', (req, res) => {

@@ -1,0 +1,137 @@
+# Default values for odin
+replicaCount: 2
+
+image:
+  repository: odin-gateway
+  pullPolicy: IfNotPresent
+  tag: 'latest'
+
+imagePullSecrets: []
+nameOverride: ''
+fullnameOverride: ''
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ''
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 8080
+  adminPort: 8081
+
+ingress:
+  enabled: false
+  className: ''
+  annotations: {}
+  hosts:
+    - host: odin.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+config:
+  gateway:
+    port: 8080
+    readTimeout: 30s
+    writeTimeout: 30s
+    idleTimeout: 60s
+
+  admin:
+    enabled: true
+    port: 8081
+    username: admin
+    password: admin123
+
+  auth:
+    jwtSecret: ''
+    accessTokenTTL: 1h
+    refreshTokenTTL: 24h
+    oauth2:
+      enabled: false
+      providers: {}
+
+  circuitBreaker:
+    maxRequests: 10
+    interval: 60s
+    timeout: 60s
+    failureRatio: 0.5
+    minRequests: 5
+
+  websocket:
+    enabled: true
+    readBufferSize: 4096
+    writeBufferSize: 4096
+    handshakeTimeout: 10s
+    readTimeout: 60s
+    writeTimeout: 10s
+    pingPeriod: 54s
+    maxMessageSize: 524288
+    enableCompression: false
+
+  logging:
+    level: info
+    format: json
+
+services: []
+
+# Redis dependency
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: false
+
+# Prometheus dependency
+prometheus:
+  enabled: false
+  server:
+    persistentVolume:
+      enabled: false
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+
+secrets:
+  jwtSecret: ''
+  oauth2ClientSecrets: {}

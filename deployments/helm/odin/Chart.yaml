@@ -1,0 +1,26 @@
+apiVersion: v2
+name: odin
+description: A Helm chart for Odin API Gateway
+type: application
+version: 0.1.0
+appVersion: '1.0.0'
+keywords:
+  - api-gateway
+  - microservices
+  - proxy
+  - kubernetes
+home: https://github.com/sepehr-mohseni/odin
+sources:
+  - https://github.com/sepehr-mohseni/odin
+maintainers:
+  - name: Sepehr Mohseni
+    email: isepehrmohseni@gmail.com
+dependencies:
+  - name: redis
+    version: '17.x.x'
+    repository: 'https://charts.bitnami.com/bitnami'
+    condition: redis.enabled
+  - name: prometheus
+    version: '15.x.x'
+    repository: 'https://prometheus-community.github.io/helm-charts'
+    condition: prometheus.enabled
