@@ -387,11 +387,12 @@ func setNestedValue(data map[string]interface{}, path []string, value interface{
 			return
 		}
 
-		nextMap, ok := currentMap[key].(map[string]interface{})
-		if !ok {
-			nextMap = make(map[string]interface{})
-			currentMap[key] = nextMap
+		if nextMap, ok := currentMap[key].(map[string]interface{}); ok {
+			currentMap = nextMap
+		} else {
+			newMap := make(map[string]interface{})
+			currentMap[key] = newMap
+			currentMap = newMap
 		}
-		currentMap = nextMap
 	}
 }

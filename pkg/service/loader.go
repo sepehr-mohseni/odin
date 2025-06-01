@@ -3,51 +3,61 @@ package service
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
 )
 
-type ServiceConfigFile struct {
-	Services []*Config `yaml:"services"`
+type ServiceConfig struct {
+	Services []Config `yaml:"services"`
 }
 
-func LoadFromFile(filename string, logger *logrus.Logger) (*Registry, error) {
-	data, err := os.ReadFile(filename)
+func LoadServices(configPath string, logger *logrus.Logger) ([]Config, error) {
+	data, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read service configuration: %w", err)
+		return nil, fmt.Errorf("failed to read services config file: %w", err)
 	}
 
-	var configFile ServiceConfigFile
-	if err := yaml.Unmarshal(data, &configFile); err != nil {
-		return nil, fmt.Errorf("failed to parse service configuration: %w", err)
+	var serviceConfig ServiceConfig
+	if err := yaml.Unmarshal(data, &serviceConfig); err != nil {
+		return nil, fmt.Errorf("failed to parse services config file: %w", err)
 	}
 
-	registry := NewRegistry(logger)
-
-	for _, svc := range configFile.Services {
-		if err := registry.Register(svc); err != nil {
-			logger.WithError(err).Warnf("Failed to register service %s", svc.Name)
-		}
+	// Set defaults for each service
+	for i := range serviceConfig.Services {
+		setServiceDefaults(&serviceConfig.Services[i])
 	}
 
-	return registry, nil
+	logger.WithField("count", len(serviceConfig.Services)).Info("Loaded services configuration")
+
+	return serviceConfig.Services, nil
 }
 
-func (r *Registry) SaveToFile(filename string) error {
-	services := r.GetAllServices()
-
-	configFile := ServiceConfigFile{
-		Services: services,
+func setServiceDefaults(config *Config) {
+	if config.Timeout == 0 {
+		config.Timeout = 30 * time.Second
 	}
-
-	data, err := yaml.Marshal(configFile)
-	if err != nil {
-		return fmt.Errorf("failed to marshal service configuration: %w", err)
+	if config.RetryCount == 0 {
+		config.RetryCount = 3
 	}
+	if config.RetryDelay == 0 {
+		config.RetryDelay = 1 * time.Second
+	}
+	if config.LoadBalancing == "" {
+		config.LoadBalancing = "round_robin"
+	}
+}
 
-	if err := os.WriteFile(filename, data, 0644); err != nil {
-		return fmt.Errorf("failed to write service configuration file: %w", err)
+func ValidateService(config *Config) error {
+	if config.Name == "" {
+		return fmt.Errorf("service name cannot be empty")
+	}
+	if config.BasePath == "" {
+		return fmt.Errorf("service basePath cannot be empty")
+	}
+	if len(config.Targets) == 0 {
+		return fmt.Errorf("service must have at least one target")
 	}
 
 	return nil

@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"fmt"
 	"odin/pkg/cache"
 	"odin/pkg/service"
 
@@ -34,6 +33,7 @@ func (r *Router) SetAuthMiddleware(middleware echo.MiddlewareFunc) {
 }
 
 func (r *Router) RegisterRoutes() error {
+	// Register service routes
 	services := r.registry.GetAllServices()
 
 	for _, svc := range services {
@@ -42,19 +42,24 @@ func (r *Router) RegisterRoutes() error {
 			"basePath": svc.BasePath,
 		}).Info("Registering service route")
 
-		routeGroup := r.echo.Group(svc.BasePath)
-
-		if svc.Authentication && r.authMiddleware != nil {
-			routeGroup.Use(r.authMiddleware)
-		}
-
+		// Create service handler
 		handler, err := NewServiceHandler(svc, r.logger, r.cacheStore)
 		if err != nil {
-			return fmt.Errorf("failed to create proxy for service %s: %w", svc.Name, err)
+			r.logger.WithError(err).Warnf("Failed to create handler for service %s", svc.Name)
+			continue
 		}
 
-		routeGroup.Any("", handler.Handle)
-		routeGroup.Any("/*", handler.Handle)
+		// Create route group
+		group := r.echo.Group(svc.BasePath)
+
+		// Apply authentication middleware if required
+		if svc.Authentication && r.authMiddleware != nil {
+			group.Use(r.authMiddleware)
+		}
+
+		// Register routes
+		group.Any("", handler.Handle)
+		group.Any("/*", handler.Handle)
 	}
 
 	return nil

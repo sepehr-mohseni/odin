@@ -14,7 +14,6 @@ import (
 	"odin/pkg/logging"
 	"odin/pkg/middleware"
 	"odin/pkg/monitoring"
-	"odin/pkg/proxy"
 	"odin/pkg/routing"
 	"odin/pkg/service"
 
@@ -179,28 +178,6 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 
 	adminHandler.Register(e)
 	logger.Info("Admin interface registered at /admin")
-
-	for _, svc := range cfg.Services {
-		logger.WithFields(logrus.Fields{
-			"name":     svc.Name,
-			"basePath": svc.BasePath,
-			"targets":  svc.Targets,
-		}).Info("Registering service route")
-
-		routeGroup := e.Group(svc.BasePath)
-
-		if svc.Authentication {
-			routeGroup.Use(authMiddleware)
-		}
-
-		proxyHandler, err := proxy.NewHandler(svc, logger)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create proxy for service %s: %w", svc.Name, err)
-		}
-
-		routeGroup.Any("", proxyHandler)
-		routeGroup.Any("/*", proxyHandler)
-	}
 
 	return gateway, nil
 }

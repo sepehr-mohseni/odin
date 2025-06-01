@@ -19,6 +19,57 @@ type AuthSecrets struct {
 	JWTSecret string `yaml:"jwtSecret"`
 }
 
+type JWTConfig struct {
+	Secret          string        `yaml:"secret"`
+	AccessTokenTTL  time.Duration `yaml:"accessTokenTTL"`
+	RefreshTokenTTL time.Duration `yaml:"refreshTokenTTL"`
+}
+
+type Claims struct {
+	UserID   string `json:"user_id"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
+	jwt.RegisteredClaims
+}
+
+type JWTManager struct {
+	secret          string
+	accessTokenTTL  time.Duration
+	refreshTokenTTL time.Duration
+}
+
+func NewJWTManager(config JWTConfig) *JWTManager {
+	return &JWTManager{
+		secret:          config.Secret,
+		accessTokenTTL:  config.AccessTokenTTL,
+		refreshTokenTTL: config.RefreshTokenTTL,
+	}
+}
+
+func (jm *JWTManager) GenerateToken(claims *Claims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(jm.secret))
+}
+
+func (jm *JWTManager) ValidateToken(tokenString string) (*Claims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(jm.secret), nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid {
+		return claims, nil
+	}
+
+	return nil, fmt.Errorf("invalid token")
+}
+
 func loadJWTSecret() (string, error) {
 	secretsPaths := []string{
 		"config/auth_secrets.yaml",

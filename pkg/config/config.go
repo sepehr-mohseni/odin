@@ -18,11 +18,12 @@ type Config struct {
 	Cache      CacheConfig      `yaml:"cache"`
 	Monitoring MonitoringConfig `yaml:"monitoring"`
 	Admin      AdminConfig      `yaml:"admin"`
-	Services   []ServiceConfig  `yaml:"-"`
+	Services   []ServiceConfig  `yaml:"services"`
 }
 
 type ServerConfig struct {
 	Port            int           `yaml:"port"`
+	Timeout         time.Duration `yaml:"timeout"`
 	ReadTimeout     time.Duration `yaml:"readTimeout"`
 	WriteTimeout    time.Duration `yaml:"writeTimeout"`
 	GracefulTimeout time.Duration `yaml:"gracefulTimeout"`
@@ -69,21 +70,29 @@ type MonitoringConfig struct {
 }
 
 type ServiceConfig struct {
-	Name           string            `yaml:"name"`
-	BasePath       string            `yaml:"basePath"`
-	Targets        []string          `yaml:"targets"`
-	StripBasePath  bool              `yaml:"stripBasePath"`
-	Timeout        time.Duration     `yaml:"timeout"`
-	RetryCount     int               `yaml:"retryCount"`
-	RetryDelay     time.Duration     `yaml:"retryDelay"`
-	Authentication bool              `yaml:"authentication"`
-	LoadBalancing  string            `yaml:"loadBalancing"`
-	Headers        map[string]string `yaml:"headers"`
-	Transform      struct {
-		Request  []TransformRule `yaml:"request"`
-		Response []TransformRule `yaml:"response"`
-	} `yaml:"transform"`
-	Aggregation *AggregationConfig `yaml:"aggregation,omitempty"`
+	Name           string             `yaml:"name"`
+	BasePath       string             `yaml:"basePath"`
+	Targets        []string           `yaml:"targets"`
+	StripBasePath  bool               `yaml:"stripBasePath"`
+	Timeout        time.Duration      `yaml:"timeout"`
+	RetryCount     int                `yaml:"retryCount"`
+	RetryDelay     time.Duration      `yaml:"retryDelay"`
+	Authentication bool               `yaml:"authentication"`
+	LoadBalancing  string             `yaml:"loadBalancing"`
+	Headers        map[string]string  `yaml:"headers"`
+	Transform      TransformConfig    `yaml:"transform"`
+	Aggregation    *AggregationConfig `yaml:"aggregation,omitempty"`
+}
+
+type TransformConfig struct {
+	Request  []TransformRule `yaml:"request"`
+	Response []TransformRule `yaml:"response"`
+}
+
+type TransformRule struct {
+	From    string `yaml:"from"`
+	To      string `yaml:"to"`
+	Default string `yaml:"default"`
 }
 
 type AggregationConfig struct {
@@ -102,14 +111,24 @@ type MappingConfig struct {
 	To   string `yaml:"to"`
 }
 
-type TransformRule struct {
-	From    string `yaml:"from"`
-	To      string `yaml:"to"`
-	Default string `yaml:"default"`
+// SetDefaults sets default values for ServiceConfig
+func (s *ServiceConfig) SetDefaults() {
+	if s.LoadBalancing == "" {
+		s.LoadBalancing = "round_robin"
+	}
+	if s.Timeout == 0 {
+		s.Timeout = 30 * time.Second
+	}
+	if s.RetryCount == 0 {
+		s.RetryCount = 3
+	}
+	if s.RetryDelay == 0 {
+		s.RetryDelay = 1 * time.Second
+	}
 }
 
-func Load(path string, logger *logrus.Logger) (*Config, error) {
-	data, err := os.ReadFile(path)
+func Load(configPath string, logger *logrus.Logger) (*Config, error) {
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
@@ -119,39 +138,73 @@ func Load(path string, logger *logrus.Logger) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	if envPort := os.Getenv("GATEWAY_PORT"); envPort != "" {
-		var port int
-		if _, err := fmt.Sscanf(envPort, "%d", &port); err == nil {
-			config.Server.Port = port
+	// Set defaults
+	if config.Server.Port == 0 {
+		config.Server.Port = 8080
+	}
+	if config.Server.ReadTimeout == 0 {
+		config.Server.ReadTimeout = 30 * time.Second
+	}
+	if config.Server.WriteTimeout == 0 {
+		config.Server.WriteTimeout = 30 * time.Second
+	}
+	if config.Server.GracefulTimeout == 0 {
+		config.Server.GracefulTimeout = 15 * time.Second
+	}
+	if config.Server.Timeout == 0 {
+		config.Server.Timeout = 30 * time.Second
+	}
+
+	if config.Logging.Level == "" {
+		config.Logging.Level = "info"
+	}
+
+	if config.Monitoring.Path == "" {
+		config.Monitoring.Path = "/metrics"
+	}
+
+	// Load services from external file if available
+	servicesPath := filepath.Join(filepath.Dir(configPath), "services.yaml")
+	if _, err := os.Stat(servicesPath); err == nil {
+		servicesData, err := os.ReadFile(servicesPath)
+		if err == nil {
+			var servicesConfig struct {
+				Services []ServiceConfig `yaml:"services"`
+			}
+			if err := yaml.Unmarshal(servicesData, &servicesConfig); err == nil {
+				config.Services = append(config.Services, servicesConfig.Services...)
+			}
 		}
 	}
 
-	servicesConfig, err := LoadServices(filepath.Join(filepath.Dir(path), "services.yaml"), logger)
-	if err != nil {
-		logger.Warnf("Failed to load services configuration: %v", err)
-		logger.Info("Proceeding with empty services configuration")
-	} else {
-		config.Services = servicesConfig
+	// Set defaults for services
+	for i := range config.Services {
+		config.Services[i].SetDefaults()
+	}
+
+	if err := validateConfig(&config); err != nil {
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	return &config, nil
 }
 
-func LoadServices(path string, logger *logrus.Logger) ([]ServiceConfig, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read services config file: %w", err)
+func validateConfig(config *Config) error {
+	if config.Server.Port <= 0 || config.Server.Port > 65535 {
+		return fmt.Errorf("invalid server port: %d", config.Server.Port)
 	}
 
-	var servicesWrapper struct {
-		Services []ServiceConfig `yaml:"services"`
+	for _, service := range config.Services {
+		if service.Name == "" {
+			return fmt.Errorf("service name cannot be empty")
+		}
+		if service.BasePath == "" {
+			return fmt.Errorf("service %s: basePath cannot be empty", service.Name)
+		}
+		if len(service.Targets) == 0 {
+			return fmt.Errorf("service %s: at least one target must be specified", service.Name)
+		}
 	}
 
-	if err := yaml.Unmarshal(data, &servicesWrapper); err != nil {
-		return nil, fmt.Errorf("failed to parse services config file: %w", err)
-	}
-
-	logger.Infof("Loaded %d services from %s", len(servicesWrapper.Services), path)
-
-	return servicesWrapper.Services, nil
+	return nil
 }

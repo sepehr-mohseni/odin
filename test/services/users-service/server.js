@@ -48,7 +48,7 @@ app.put('/api/users/:id', authenticate, (req, res) => {
 });
 
 app.delete('/api/users/:id', authenticate, (req, res) => {
-    const id = req.params.id;
+    const { id } = req.params;
     if (!users[id]) {
         return res.status(404).json({ error: 'User not found' });
     }

@@ -15,52 +15,72 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestOAuth2Manager_GetAuthURL(t *testing.T) {
-	tests := []struct {
-		name        string
-		provider    string
-		state       string
-		expectError bool
-	}{
-		{
-			name:        "valid provider",
-			provider:    "google",
-			state:       "random-state",
-			expectError: false,
-		},
-		{
-			name:        "invalid provider",
-			provider:    "invalid",
-			state:       "random-state",
-			expectError: true,
+func TestNewOAuth2Manager(t *testing.T) {
+	config := auth.OAuth2Config{
+		Enabled: true,
+		Providers: map[string]auth.OAuth2Provider{
+			"google": {
+				ClientID:     "test-client-id",
+				ClientSecret: "test-client-secret",
+				AuthURL:      "https://accounts.google.com/o/oauth2/auth",
+				TokenURL:     "https://oauth2.googleapis.com/token",
+				UserInfoURL:  "https://www.googleapis.com/oauth2/v2/userinfo",
+				Scopes:       []string{"openid", "email", "profile"},
+				RedirectURL:  "http://localhost:8080/auth/callback",
+			},
 		},
 	}
 
+	manager := auth.NewOAuth2Manager(config, logrus.New())
+	assert.NotNil(t, manager)
+}
+
+func TestOAuth2Manager_GetAuthURL(t *testing.T) {
 	config := auth.OAuth2Config{
 		Enabled: true,
 		Providers: map[string]auth.OAuth2Provider{
 			"google": {
 				ClientID:    "test-client-id",
 				AuthURL:     "https://accounts.google.com/o/oauth2/auth",
-				RedirectURL: "http://localhost:8080/callback",
-				Scopes:      []string{"openid", "profile"},
+				Scopes:      []string{"openid", "email"},
+				RedirectURL: "http://localhost:8080/auth/callback",
 			},
 		},
 	}
 
 	manager := auth.NewOAuth2Manager(config, logrus.New())
 
+	tests := []struct {
+		name     string
+		provider string
+		state    string
+		wantErr  bool
+	}{
+		{
+			name:     "valid provider",
+			provider: "google",
+			state:    "test-state",
+			wantErr:  false,
+		},
+		{
+			name:     "invalid provider",
+			provider: "invalid",
+			state:    "test-state",
+			wantErr:  true,
+		},
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			url, err := manager.GetAuthURL(tt.provider, tt.state)
-
-			if tt.expectError {
+			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Empty(t, url)
 			} else {
 				assert.NoError(t, err)
+				assert.NotEmpty(t, url)
 				assert.Contains(t, url, "client_id=test-client-id")
-				assert.Contains(t, url, "state="+tt.state)
+				assert.Contains(t, url, "state=test-state")
 			}
 		})
 	}
@@ -106,7 +126,11 @@ func TestOAuth2Manager_ExchangeCodeForToken(t *testing.T) {
 }
 
 func TestOAuth2Manager_ValidateToken(t *testing.T) {
-	manager := auth.NewOAuth2Manager(auth.OAuth2Config{}, logrus.New())
+	config := auth.OAuth2Config{
+		Enabled: true,
+	}
+
+	manager := auth.NewOAuth2Manager(config, logrus.New())
 
 	tests := []struct {
 		name     string

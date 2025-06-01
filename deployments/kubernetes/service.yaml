@@ -2,14 +2,40 @@ apiVersion: v1
 kind: Service
 metadata:
   name: odin-api-gateway
+  labels:
+    app: odin-api-gateway
 spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+      name: http
+    - port: 8081
+      targetPort: 8081
+      protocol: TCP
+      name: admin
   selector:
     app: odin-api-gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: odin-api-gateway-nodeport
+  labels:
+    app: odin-api-gateway
+spec:
+  type: NodePort
   ports:
-    - name: http
-      port: 80
+    - port: 8080
       targetPort: 8080
-    - name: admin
-      port: 8081
+      nodePort: 30080
+      protocol: TCP
+      name: http
+    - port: 8081
       targetPort: 8081
-  type: ClusterIP
+      nodePort: 30081
+      protocol: TCP
+      name: admin
+  selector:
+    app: odin-api-gateway
