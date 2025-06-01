@@ -106,15 +106,17 @@ func (sm *StrategyManager) GenerateKey(req *http.Request, userContext string) st
 }
 
 func (sm *StrategyManager) ShouldCache(statusCode int, headers http.Header) bool {
-	for _, status := range sm.config.CacheableStatus {
-		if status == statusCode {
-			return true
-		}
-	}
-
+	// Check cache control headers first
 	if cacheControl := headers.Get("Cache-Control"); cacheControl != "" {
 		if strings.Contains(cacheControl, "no-cache") || strings.Contains(cacheControl, "no-store") {
 			return false
+		}
+	}
+
+	// Check if status code is cacheable
+	for _, status := range sm.config.CacheableStatus {
+		if status == statusCode {
+			return true
 		}
 	}
 

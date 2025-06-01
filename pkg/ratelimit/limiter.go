@@ -354,6 +354,8 @@ func (l *Limiter) CheckLimit(ctx context.Context, key string, rule *Rule) (*Limi
 
 func (l *Limiter) checkFixedWindow(ctx context.Context, key string, limit int, window time.Duration) (*LimitInfo, bool) {
 	if l.redisClient == nil {
+		// For local testing without Redis, we'll always allow requests
+		// In a real implementation, you'd use local storage
 		return &LimitInfo{
 			Key:       key,
 			Limit:     limit,
