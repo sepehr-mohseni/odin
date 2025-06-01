@@ -16,6 +16,20 @@ func Register(e *echo.Echo, logger *logrus.Logger) {
 		})
 	})
 
+	// Add readiness endpoint
+	e.GET("/ready", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"status": "ready",
+		})
+	})
+
+	// Add liveness endpoint
+	e.GET("/live", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, map[string]string{
+			"status": "alive",
+		})
+	})
+
 	e.GET("/debug/routes", func(c echo.Context) error {
 		routes := []map[string]string{}
 		for _, r := range e.Routes() {

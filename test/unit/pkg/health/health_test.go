@@ -14,9 +14,7 @@ import (
 
 func TestHealthEndpoint(t *testing.T) {
 	e := echo.New()
-	logger := logrus.New()
-
-	health.Register(e, logger)
+	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	rec := httptest.NewRecorder()
@@ -29,9 +27,7 @@ func TestHealthEndpoint(t *testing.T) {
 
 func TestDebugRoutesEndpoint(t *testing.T) {
 	e := echo.New()
-	logger := logrus.New()
-
-	health.Register(e, logger)
+	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/debug/routes", nil)
 	rec := httptest.NewRecorder()
@@ -45,9 +41,7 @@ func TestDebugRoutesEndpoint(t *testing.T) {
 
 func TestDebugConfigEndpoint(t *testing.T) {
 	e := echo.New()
-	logger := logrus.New()
-
-	health.Register(e, logger)
+	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/debug/config", nil)
 	rec := httptest.NewRecorder()
@@ -60,9 +54,7 @@ func TestDebugConfigEndpoint(t *testing.T) {
 
 func TestDebugContentTypesEndpoint(t *testing.T) {
 	e := echo.New()
-	logger := logrus.New()
-
-	health.Register(e, logger)
+	health.Register(e, logrus.New())
 
 	req := httptest.NewRequest("GET", "/debug/content-types", nil)
 	rec := httptest.NewRecorder()
@@ -70,6 +62,8 @@ func TestDebugContentTypesEndpoint(t *testing.T) {
 	e.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "message")
+	assert.Contains(t, rec.Body.String(), "timestamp")
 }
 
 func TestHealthCheck(t *testing.T) {
@@ -83,7 +77,7 @@ func TestHealthCheck(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.Contains(t, rec.Body.String(), "status")
-	assert.Contains(t, rec.Body.String(), "ok")
+	assert.Contains(t, rec.Body.String(), "UP")
 }
 
 func TestHealthCheckWithDependencies(t *testing.T) {
@@ -111,6 +105,7 @@ func TestReadinessCheck(t *testing.T) {
 
 	// Readiness check should return OK when services are ready
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "ready")
 }
 
 func TestLivenessCheck(t *testing.T) {
@@ -124,4 +119,5 @@ func TestLivenessCheck(t *testing.T) {
 
 	// Liveness check should always return OK if the service is running
 	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Contains(t, rec.Body.String(), "alive")
 }
