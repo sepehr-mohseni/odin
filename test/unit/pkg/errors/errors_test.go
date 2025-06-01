@@ -73,11 +73,11 @@ func TestErrorHandlerWithGenericError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
 
-	genericErr := assert.AnError
-	handler(genericErr, c)
+	err := assert.AnError
+	handler(err, c)
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-	assert.Contains(t, rec.Body.String(), "Internal Server Error")
+	assert.Contains(t, rec.Body.String(), "Internal server error")
 }
 
 func TestStatusCodeFromError(t *testing.T) {

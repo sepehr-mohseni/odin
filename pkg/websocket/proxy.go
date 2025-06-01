@@ -212,8 +212,12 @@ func (c *Connection) proxyServerToClient() {
 
 func (c *Connection) close() {
 	c.once.Do(func() {
-		c.clientConn.Close()
-		c.serverConn.Close()
+		if err := c.clientConn.Close(); err != nil {
+			c.proxy.logger.WithError(err).Debug("Error closing client connection")
+		}
+		if err := c.serverConn.Close(); err != nil {
+			c.proxy.logger.WithError(err).Debug("Error closing server connection")
+		}
 		close(c.done)
 	})
 }

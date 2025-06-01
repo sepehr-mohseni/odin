@@ -115,6 +115,31 @@ func TestValidateInvalidToken(t *testing.T) {
 	manager := auth.NewJWTManager(config)
 
 	// Validate an invalid token
-	_, err := manager.ValidateToken("invalid.token.here")
+	_, err := manager.ValidateToken("invalid-token")
 	assert.Error(t, err)
+}
+
+func TestJWTBasicFunctionality(t *testing.T) {
+	config := auth.JWTConfig{
+		Secret:          "test-secret",
+		AccessTokenTTL:  time.Hour,
+		RefreshTokenTTL: 24 * time.Hour,
+	}
+
+	manager := auth.NewJWTManager(config)
+
+	claims := &auth.Claims{
+		UserID: "test-user",
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+		},
+	}
+
+	token, err := manager.GenerateToken(claims)
+	assert.NoError(t, err)
+	assert.NotEmpty(t, token)
+
+	validatedClaims, err := manager.ValidateToken(token)
+	assert.NoError(t, err)
+	assert.Equal(t, "test-user", validatedClaims.UserID)
 }

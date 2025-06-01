@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
 
@@ -27,6 +27,9 @@ COPY --from=builder /odin .
 # Copy templates and static files
 COPY --from=builder /app/pkg/admin/templates/ ./pkg/admin/templates/
 COPY --from=builder /app/config/default_config.yaml ./config/config.yaml
+
+# Create volume mount points
+VOLUME ["/app/config"]
 
 # Expose the ports
 EXPOSE 8080

@@ -348,3 +348,17 @@ func getNestedValue(data map[string]interface{}, path []string) (interface{}, bo
 
 	return nil, false
 }
+
+func parseArrayIndex(segment string) (int, bool) {
+	if !strings.HasPrefix(segment, "[") || !strings.HasSuffix(segment, "]") {
+		return 0, false
+	}
+
+	indexStr := segment[1 : len(segment)-1]
+	index, err := strconv.Atoi(indexStr)
+	if err != nil {
+		return 0, false
+	}
+
+	return index, true
+}

@@ -132,7 +132,7 @@ func TestNewHandlerInvalidTarget(t *testing.T) {
 	serviceConfig := config.ServiceConfig{
 		Name:     "test-service",
 		BasePath: "/api/test",
-		Targets:  []string{"invalid-url-with-no-scheme"},
+		Targets:  []string{"://invalid-url-with-no-scheme"},
 		Timeout:  30 * time.Second,
 	}
 

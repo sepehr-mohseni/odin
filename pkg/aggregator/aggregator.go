@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"odin/pkg/config"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,61 +54,46 @@ func (a *Aggregator) RegisterRoutes(e *echo.Echo) {
 }
 
 func (a *Aggregator) AggregateHandler(c echo.Context) error {
-	var services []string
-	if servicesParam := c.QueryParam("services"); servicesParam != "" {
-		if err := json.Unmarshal([]byte(servicesParam), &services); err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, "Invalid services parameter")
-		}
+	ctx := c.Request().Context()
+
+	// Get query parameters for services to aggregate
+	serviceNames := c.QueryParam("services")
+	if serviceNames == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "services parameter is required")
 	}
 
-	if len(services) == 0 {
-		for serviceName := range a.serviceConfigs {
-			services = append(services, serviceName)
-		}
-	}
+	services := strings.Split(serviceNames, ",")
+	responses := make(map[string]*ServiceResponse)
 
-	response := AggregateResponse{
-		Success:   true,
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-		Results:   make(map[string]*ServiceResponse),
-	}
-
+	// Use sync.WaitGroup for concurrent requests
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
-	timeout := 10 * time.Second
-	if timeoutParam := c.QueryParam("timeout"); timeoutParam != "" {
-		if t, err := time.ParseDuration(timeoutParam); err == nil && t > 0 {
-			timeout = t
-		}
-	}
-
-	ctx, cancel := context.WithTimeout(c.Request().Context(), timeout)
-	defer cancel()
-
 	for _, serviceName := range services {
-		serviceConfig, exists := a.serviceConfigs[serviceName]
-		if !exists {
-			response.Results[serviceName] = &ServiceResponse{
-				Service: serviceName,
-				Status:  http.StatusNotFound,
-				Error:   "Service not found",
-			}
-			continue
-		}
+		serviceName = strings.TrimSpace(serviceName)
+		if serviceConfig, exists := a.serviceConfigs[serviceName]; exists {
+			wg.Add(1)
+			go func(svcName string, svcConfig *config.ServiceConfig) {
+				defer wg.Done()
 
-		wg.Add(1)
-		go func(svc config.ServiceConfig) {
-			defer wg.Done()
-			serviceResp := a.callService(ctx, c, &svc)
-			mu.Lock()
-			response.Results[svc.Name] = serviceResp
-			mu.Unlock()
-		}(serviceConfig)
+				response := a.callService(ctx, c, svcConfig)
+
+				mu.Lock()
+				responses[svcName] = response
+				mu.Unlock()
+			}(serviceName, &serviceConfig) // Fix: take address of serviceConfig
+		}
 	}
 
 	wg.Wait()
-	return c.JSON(http.StatusOK, response)
+
+	// Build aggregated response
+	aggregatedResponse := map[string]interface{}{
+		"services":  responses,
+		"timestamp": time.Now().Unix(),
+	}
+
+	return c.JSON(http.StatusOK, aggregatedResponse)
 }
 
 func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *config.ServiceConfig) *ServiceResponse {
@@ -189,4 +176,247 @@ func (a *Aggregator) callService(ctx context.Context, c echo.Context, svc *confi
 		Status:  resp.StatusCode,
 		Data:    respData,
 	}
+}
+
+func (a *Aggregator) fetchDependencyData(c echo.Context, dep config.DependencyConfig) (interface{}, error) {
+	targetURL := a.buildTargetURL(c, dep)
+
+	req, err := http.NewRequest("GET", targetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	copyHeaders(c.Request(), req, dep.ParameterMapping)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("dependency service returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var data interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+
+	return a.mapResponseData(data, dep.ResultMapping), nil
+}
+
+func (a *Aggregator) buildTargetURL(c echo.Context, dep config.DependencyConfig) string {
+	// Build the target URL by replacing parameters in the path
+	targetURL := dep.Path
+
+	// If we have a service configuration, use its first target as base
+	if serviceConfig, exists := a.serviceConfigs[dep.Service]; exists && len(serviceConfig.Targets) > 0 {
+		baseURL := serviceConfig.Targets[0]
+		if !strings.HasSuffix(baseURL, "/") && !strings.HasPrefix(dep.Path, "/") {
+			targetURL = baseURL + "/" + dep.Path
+		} else {
+			targetURL = baseURL + dep.Path
+		}
+	}
+
+	// Replace parameters in the URL
+	for _, mapping := range dep.ParameterMapping {
+		paramName := strings.TrimPrefix(mapping.To, "{")
+		paramName = strings.TrimSuffix(paramName, "}")
+
+		// Get parameter value from request context or extract from original response
+		paramValue := c.QueryParam(paramName)
+		if paramValue == "" {
+			paramValue = c.Param(paramName)
+		}
+
+		if paramValue != "" {
+			targetURL = strings.ReplaceAll(targetURL, "{"+paramName+"}", paramValue)
+		}
+	}
+
+	return targetURL
+}
+
+func copyHeaders(srcReq *http.Request, destReq *http.Request, paramMappings []config.MappingConfig) {
+	// Copy relevant headers from source to destination request
+	headersToForward := []string{
+		"Authorization",
+		"Content-Type",
+		"Accept",
+		"User-Agent",
+		"X-Forwarded-For",
+		"X-Real-IP",
+	}
+
+	for _, header := range headersToForward {
+		if value := srcReq.Header.Get(header); value != "" {
+			destReq.Header.Set(header, value)
+		}
+	}
+
+	// Apply any header mappings from parameter mappings
+	for _, mapping := range paramMappings {
+		if strings.HasPrefix(mapping.From, "$.headers.") {
+			headerName := strings.TrimPrefix(mapping.From, "$.headers.")
+			if value := srcReq.Header.Get(headerName); value != "" {
+				destReq.Header.Set(mapping.To, value)
+			}
+		}
+	}
+}
+
+func (a *Aggregator) mapResponseData(data interface{}, mappings []config.MappingConfig) interface{} {
+	if len(mappings) == 0 {
+		return data
+	}
+
+	// Convert to map for easier manipulation
+	dataMap, ok := data.(map[string]interface{})
+	if !ok {
+		// If it's not a map, return as-is
+		return data
+	}
+
+	result := make(map[string]interface{})
+
+	// Apply each mapping
+	for _, mapping := range mappings {
+		fromPath := strings.TrimPrefix(mapping.From, "$.")
+		toPath := strings.TrimPrefix(mapping.To, "$.")
+
+		// If from path is root ($), copy entire object
+		if mapping.From == "$" {
+			if toPath == "" {
+				return dataMap
+			}
+			setNestedValue(result, strings.Split(toPath, "."), dataMap)
+		} else {
+			// Extract value from source path
+			value, found := getNestedValue(dataMap, strings.Split(fromPath, "."))
+			if found && value != nil {
+				if toPath == "" {
+					return value
+				}
+				setNestedValue(result, strings.Split(toPath, "."), value)
+			}
+		}
+	}
+
+	// If no mappings resulted in data, return original
+	if len(result) == 0 {
+		return dataMap
+	}
+
+	return result
+}
+
+func (a *Aggregator) EnrichResponse(ctx context.Context, serviceName string, responseBody []byte, headers http.Header, authToken string) ([]byte, error) {
+	serviceConfig, exists := a.serviceConfigs[serviceName]
+	if !exists || serviceConfig.Aggregation == nil {
+		return responseBody, nil
+	}
+
+	var originalResponse map[string]interface{}
+	if err := json.Unmarshal(responseBody, &originalResponse); err != nil {
+		return responseBody, nil
+	}
+
+	enrichedResponse := make(map[string]interface{})
+
+	// Copy original response
+	for k, v := range originalResponse {
+		enrichedResponse[k] = v
+	}
+
+	// Fetch and merge dependency data
+	for _, dep := range serviceConfig.Aggregation.Dependencies {
+		depData, err := a.fetchDependencyDataForEnrichment(ctx, dep, originalResponse, authToken)
+		if err != nil {
+			a.logger.WithError(err).Warnf("Failed to fetch dependency data from %s", dep.Service)
+			continue
+		}
+
+		// Apply result mappings
+		if len(dep.ResultMapping) > 0 {
+			for _, mapping := range dep.ResultMapping {
+				toPath := strings.TrimPrefix(mapping.To, "$.")
+				if toPath != "" {
+					setNestedValue(enrichedResponse, strings.Split(toPath, "."), depData)
+				}
+			}
+		} else {
+			// If no mapping specified, use service name as key
+			enrichedResponse[dep.Service] = depData
+		}
+	}
+
+	return json.Marshal(enrichedResponse)
+}
+
+func (a *Aggregator) fetchDependencyDataForEnrichment(ctx context.Context, dep config.DependencyConfig, originalResponse map[string]interface{}, authToken string) (interface{}, error) {
+	targetURL := dep.Path
+
+	// If we have a service configuration, use its first target as base
+	if serviceConfig, exists := a.serviceConfigs[dep.Service]; exists && len(serviceConfig.Targets) > 0 {
+		baseURL := serviceConfig.Targets[0]
+		if !strings.HasSuffix(baseURL, "/") && !strings.HasPrefix(dep.Path, "/") {
+			targetURL = baseURL + "/" + dep.Path
+		} else {
+			targetURL = baseURL + dep.Path
+		}
+	}
+
+	// Replace parameters in the URL using original response data
+	for _, mapping := range dep.ParameterMapping {
+		paramName := strings.TrimPrefix(mapping.To, "{")
+		paramName = strings.TrimSuffix(paramName, "}")
+
+		// Extract parameter value from original response
+		fromPath := strings.TrimPrefix(mapping.From, "$.")
+		paramValue, _ := getNestedValue(originalResponse, strings.Split(fromPath, "."))
+
+		if paramValue != nil {
+			targetURL = strings.ReplaceAll(targetURL, "{"+paramName+"}", fmt.Sprintf("%v", paramValue))
+		}
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	if authToken != "" {
+		req.Header.Set("Authorization", authToken)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("dependency service returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var data interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+
+	return a.mapResponseData(data, dep.ResultMapping), nil
 }

@@ -72,15 +72,17 @@ func (sm *StrategyManager) GenerateKey(req *http.Request, userContext string) st
 	keyParts = append(keyParts, req.URL.Path)
 
 	if req.URL.RawQuery != "" {
-		params, _ := url.ParseQuery(req.URL.RawQuery)
-		var sortedParams []string
-		for key, values := range params {
-			for _, value := range values {
-				sortedParams = append(sortedParams, fmt.Sprintf("%s=%s", key, value))
+		params, err := url.ParseQuery(req.URL.RawQuery)
+		if err == nil {
+			var sortedParams []string
+			for key, values := range params {
+				for _, value := range values {
+					sortedParams = append(sortedParams, fmt.Sprintf("%s=%s", key, value))
+				}
 			}
+			sort.Strings(sortedParams)
+			keyParts = append(keyParts, strings.Join(sortedParams, "&"))
 		}
-		sort.Strings(sortedParams)
-		keyParts = append(keyParts, strings.Join(sortedParams, "&"))
 	}
 
 	if sm.config.Strategy == StrategyVary && len(sm.config.VaryHeaders) > 0 {

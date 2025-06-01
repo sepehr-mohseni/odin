@@ -4,174 +4,126 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"odin/pkg/config"
 	"strings"
-	"sync"
-
-	"github.com/sirupsen/logrus"
+	"time"
 )
 
-func (a *Aggregator) EnrichResponse(ctx context.Context, serviceName string, responseBody []byte, headers http.Header, authToken string) ([]byte, error) {
-	svcConfig, exists := a.serviceConfigs[serviceName]
-	if !exists {
-		a.logger.WithField("service", serviceName).Info("No service config found for enrichment")
+// EnrichmentService handles response enrichment with dependency data
+type EnrichmentService struct {
+	aggregator *Aggregator
+}
+
+// NewEnrichmentService creates a new enrichment service
+func NewEnrichmentService(aggregator *Aggregator) *EnrichmentService {
+	return &EnrichmentService{
+		aggregator: aggregator,
+	}
+}
+
+// EnrichResponse enriches a response with data from dependencies
+func (e *EnrichmentService) EnrichResponse(ctx context.Context, serviceName string, responseBody []byte, headers http.Header, authToken string) ([]byte, error) {
+	serviceConfig, exists := e.aggregator.serviceConfigs[serviceName]
+	if !exists || serviceConfig.Aggregation == nil {
 		return responseBody, nil
 	}
 
-	if svcConfig.Aggregation == nil || len(svcConfig.Aggregation.Dependencies) == 0 {
-		a.logger.WithField("service", serviceName).Debug("No aggregation config found")
+	var originalResponse map[string]interface{}
+	if err := json.Unmarshal(responseBody, &originalResponse); err != nil {
 		return responseBody, nil
 	}
 
-	if len(responseBody) > 0 && responseBody[0] == '<' {
-		a.logger.WithFields(logrus.Fields{
-			"service":      serviceName,
-			"body_preview": string(responseBody[:min(100, len(responseBody))]),
-		}).Warn("Received HTML instead of JSON")
-		return responseBody, fmt.Errorf("received HTML instead of JSON from service %s", serviceName)
+	enrichedResponse := make(map[string]interface{})
+
+	// Copy original response
+	for k, v := range originalResponse {
+		enrichedResponse[k] = v
 	}
 
-	var responseData map[string]interface{}
-	if err := json.Unmarshal(responseBody, &responseData); err != nil {
-		a.logger.WithError(err).WithFields(logrus.Fields{
-			"service":      serviceName,
-			"body_length":  len(responseBody),
-			"body_preview": string(responseBody[:min(100, len(responseBody))]),
-		}).Error("Failed to parse response for aggregation")
-		return responseBody, err
-	}
-
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	var enrichmentErrors []error
-
-	for _, dep := range svcConfig.Aggregation.Dependencies {
-		depSvcConfig, exists := a.serviceConfigs[dep.Service]
-		if !exists {
-			a.logger.Warnf("Dependent service %s not found in config", dep.Service)
+	// Fetch and merge dependency data
+	for _, dep := range serviceConfig.Aggregation.Dependencies {
+		depData, err := e.fetchDependencyData(ctx, dep, originalResponse, authToken)
+		if err != nil {
+			e.aggregator.logger.WithError(err).Warnf("Failed to fetch dependency data from %s", dep.Service)
 			continue
 		}
 
-		pathParams := make(map[string][]string)
-		for _, mapping := range dep.ParameterMapping {
-			values := a.extractValues(responseData, mapping.From)
-			if len(values) > 0 {
-				pathParams[mapping.To] = values
-				a.logger.WithFields(logrus.Fields{
-					"from":   mapping.From,
-					"to":     mapping.To,
-					"values": values,
-				}).Debug("Extracted parameter values")
-			} else {
-				a.logger.WithFields(logrus.Fields{
-					"from":    mapping.From,
-					"service": serviceName,
-				}).Warn("No parameter values extracted")
+		// Apply result mappings
+		if len(dep.ResultMapping) > 0 {
+			for _, mapping := range dep.ResultMapping {
+				toPath := strings.TrimPrefix(mapping.To, "$.")
+				if toPath != "" {
+					setNestedValue(enrichedResponse, strings.Split(toPath, "."), depData)
+				}
 			}
-		}
-
-		if len(pathParams) == 0 {
-			a.logger.WithFields(logrus.Fields{
-				"service":    serviceName,
-				"dependency": dep.Service,
-			}).Warn("No parameters extracted for dependency")
-			continue
-		}
-
-		for paramName, paramValues := range pathParams {
-			for _, paramValue := range paramValues {
-				wg.Add(1)
-
-				go func(paramName, paramValue string, dependency *config.DependencyConfig) {
-					defer wg.Done()
-
-					depPath := dependency.Path
-					paramPattern := fmt.Sprintf("{%s}", paramName)
-					depPath = strings.Replace(depPath, paramPattern, paramValue, -1)
-
-					target := depSvcConfig.Targets[0]
-					depURL := fmt.Sprintf("%s%s", target, depPath)
-
-					a.logger.WithFields(logrus.Fields{
-						"url":        depURL,
-						"dependency": dependency.Service,
-						"param":      fmt.Sprintf("%s=%s", paramName, paramValue),
-					}).Debug("Making dependency request")
-
-					depResp, err := a.makeRequest(ctx, depURL, authToken)
-					if err != nil {
-						mu.Lock()
-						enrichmentErrors = append(enrichmentErrors, fmt.Errorf("aggregation request to %s failed: %w", depURL, err))
-						mu.Unlock()
-						a.logger.WithError(err).Errorf("Aggregation request to %s failed", depURL)
-						return
-					}
-
-					if len(depResp) > 0 && depResp[0] == '<' {
-						mu.Lock()
-						enrichmentErrors = append(enrichmentErrors, fmt.Errorf("received HTML from %s", depURL))
-						mu.Unlock()
-						a.logger.WithFields(logrus.Fields{
-							"url":          depURL,
-							"body_preview": string(depResp[:min(100, len(depResp))]),
-						}).Error("Dependency returned HTML instead of JSON")
-						return
-					}
-
-					var depData map[string]interface{}
-					if err := json.Unmarshal(depResp, &depData); err != nil {
-						mu.Lock()
-						enrichmentErrors = append(enrichmentErrors, fmt.Errorf("failed to parse response from %s: %w", depURL, err))
-						mu.Unlock()
-						a.logger.WithError(err).WithFields(logrus.Fields{
-							"url":          depURL,
-							"body_preview": string(depResp[:min(100, len(depResp))]),
-						}).Error("Failed to parse dependency response")
-						return
-					}
-
-					mu.Lock()
-					for _, resultMapping := range dependency.ResultMapping {
-						mappingTo := resultMapping.To
-						mappingTo = strings.Replace(mappingTo, "{"+paramName+"}", paramValue, -1)
-
-						a.logger.WithFields(logrus.Fields{
-							"from":        resultMapping.From,
-							"to":          mappingTo,
-							"param_value": paramValue,
-						}).Debug("Applying result mapping")
-						a.mapData(responseData, depData, resultMapping.From, mappingTo, paramValue, paramName)
-					}
-					mu.Unlock()
-				}(paramName, paramValue, &dep)
-			}
+		} else {
+			// If no mapping specified, use service name as key
+			enrichedResponse[dep.Service] = depData
 		}
 	}
 
-	wg.Wait()
+	return json.Marshal(enrichedResponse)
+}
 
-	keysToDelete := []string{}
-	for k := range responseData {
-		if strings.Contains(k, "?(") || strings.Contains(k, "items[?(@") {
-			keysToDelete = append(keysToDelete, k)
+// fetchDependencyData fetches data from a dependency service
+func (e *EnrichmentService) fetchDependencyData(ctx context.Context, dep config.DependencyConfig, originalResponse map[string]interface{}, authToken string) (interface{}, error) {
+	targetURL := dep.Path
+
+	// If we have a service configuration, use its first target as base
+	if serviceConfig, exists := e.aggregator.serviceConfigs[dep.Service]; exists && len(serviceConfig.Targets) > 0 {
+		baseURL := serviceConfig.Targets[0]
+		if !strings.HasSuffix(baseURL, "/") && !strings.HasPrefix(dep.Path, "/") {
+			targetURL = baseURL + "/" + dep.Path
+		} else {
+			targetURL = baseURL + dep.Path
 		}
 	}
 
-	for _, k := range keysToDelete {
-		a.logger.WithField("key", k).Info("Removing invalid JSONPath key")
-		delete(responseData, k)
+	// Replace parameters in the URL using original response data
+	for _, mapping := range dep.ParameterMapping {
+		paramName := strings.TrimPrefix(mapping.To, "{")
+		paramName = strings.TrimSuffix(paramName, "}")
+
+		// Extract parameter value from original response
+		fromPath := strings.TrimPrefix(mapping.From, "$.")
+		paramValue, found := getNestedValue(originalResponse, strings.Split(fromPath, "."))
+
+		if found && paramValue != nil {
+			targetURL = strings.ReplaceAll(targetURL, "{"+paramName+"}", fmt.Sprintf("%v", paramValue))
+		}
 	}
 
-	if len(enrichmentErrors) > 0 {
-		a.logger.WithField("error_count", len(enrichmentErrors)).Warn("Encountered errors during enrichment")
-	}
-
-	enrichedResponse, err := json.Marshal(responseData)
+	req, err := http.NewRequestWithContext(ctx, "GET", targetURL, nil)
 	if err != nil {
-		a.logger.WithError(err).Error("Failed to marshal enriched response")
-		return responseBody, err
+		return nil, err
 	}
 
-	return enrichedResponse, nil
+	if authToken != "" {
+		req.Header.Set("Authorization", authToken)
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("dependency service returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var data interface{}
+	if err := json.Unmarshal(body, &data); err != nil {
+		return nil, err
+	}
+
+	return e.aggregator.mapResponseData(data, dep.ResultMapping), nil
 }

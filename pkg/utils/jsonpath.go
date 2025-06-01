@@ -3,59 +3,55 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
 // JSONPath extracts a value from JSON data using a simple JSONPath-like syntax
 // Example: $.users[0].name
 func JSONPath(data []byte, path string) (interface{}, error) {
-	if !strings.HasPrefix(path, "$.") {
-		return nil, fmt.Errorf("path must start with $.")
-	}
-
-	var jsonData interface{}
-	if err := json.Unmarshal(data, &jsonData); err != nil {
-		return nil, err
+	var result interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
 	}
 
 	// Remove $. prefix
-	path = strings.TrimPrefix(path, "$.")
-	if path == "" {
-		return jsonData, nil
+	if strings.HasPrefix(path, "$.") {
+		path = path[2:]
 	}
 
 	// Split path components
 	components := strings.Split(path, ".")
-	result := jsonData
 
 	for _, component := range components {
 		// Handle array indexing
 		if strings.Contains(component, "[") && strings.Contains(component, "]") {
-			parts := strings.SplitN(component, "[", 2)
+			// Extract field name and index
+			parts := strings.Split(component, "[")
 			fieldName := parts[0]
-			indexStr := strings.TrimRight(parts[1], "]")
+			indexPart := strings.TrimSuffix(parts[1], "]")
 
 			// Get the map at field name
 			mapObj, ok := result.(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf("expected object at path '%s', got %T", fieldName, result)
+				return nil, fmt.Errorf("expected object for field access '%s', got %T", fieldName, result)
 			}
 
-			result, ok = mapObj[fieldName]
-			if !ok {
+			arrayValue, exists := mapObj[fieldName]
+			if !exists {
 				return nil, fmt.Errorf("field '%s' not found", fieldName)
 			}
 
 			// Parse array index
-			var index int
-			if _, err := fmt.Sscanf(indexStr, "%d", &index); err != nil {
-				return nil, fmt.Errorf("invalid array index '%s'", indexStr)
+			index, err := strconv.Atoi(indexPart)
+			if err != nil {
+				return nil, fmt.Errorf("invalid array index '%s': %w", indexPart, err)
 			}
 
 			// Access array element
-			array, ok := result.([]interface{})
+			array, ok := arrayValue.([]interface{})
 			if !ok {
-				return nil, fmt.Errorf("expected array at path '%s[%d]', got %T", fieldName, index, result)
+				return nil, fmt.Errorf("expected array for field '%s', got %T", fieldName, arrayValue)
 			}
 
 			if index < 0 || index >= len(array) {
@@ -81,60 +77,35 @@ func JSONPath(data []byte, path string) (interface{}, error) {
 }
 
 // SetJSONPath sets a value at a specific path in a JSON object
-func SetJSONPath(data []byte, path string, value interface{}) ([]byte, error) {
-	if !strings.HasPrefix(path, "$.") {
-		return nil, fmt.Errorf("path must start with $.")
+func SetJSONPath(data map[string]interface{}, path string, value interface{}) error {
+	if strings.HasPrefix(path, "$.") {
+		path = path[2:]
 	}
 
-	var jsonData map[string]interface{}
-	if err := json.Unmarshal(data, &jsonData); err != nil {
-		return nil, err
-	}
-
-	// Remove $. prefix
-	path = strings.TrimPrefix(path, "$.")
-	if path == "" {
-		// Setting the root object - just marshal the value
-		return json.Marshal(value)
-	}
-
-	// Split path components
 	components := strings.Split(path, ".")
+	current := data
 
-	// Recursive function to set the value
-	var setNestedValue func(obj map[string]interface{}, pathComponents []string, val interface{}) error
-	setNestedValue = func(obj map[string]interface{}, pathComponents []string, val interface{}) error {
-		if len(pathComponents) == 1 {
-			// We're at the last component, set the value
-			obj[pathComponents[0]] = val
+	for i, component := range components {
+		if i == len(components)-1 {
+			// Last component, set the value
+			current[component] = value
 			return nil
 		}
 
-		// We need to navigate deeper
-		component := pathComponents[0]
-		remaining := pathComponents[1:]
-
-		// Check if this key exists
-		nextObj, exists := obj[component]
-		if !exists {
-			// Create a new map for this path
-			newMap := make(map[string]interface{})
-			obj[component] = newMap
-			return setNestedValue(newMap, remaining, val)
+		// Navigate or create intermediate objects
+		if next, exists := current[component]; exists {
+			if nextMap, ok := next.(map[string]interface{}); ok {
+				current = nextMap
+			} else {
+				return fmt.Errorf("cannot set path: intermediate component '%s' is not an object", component)
+			}
+		} else {
+			// Create new object
+			newObj := make(map[string]interface{})
+			current[component] = newObj
+			current = newObj
 		}
-
-		// Key exists, check if it's a map
-		nextMap, ok := nextObj.(map[string]interface{})
-		if !ok {
-			return fmt.Errorf("cannot set value: path component '%s' is not an object", component)
-		}
-
-		return setNestedValue(nextMap, remaining, val)
 	}
 
-	if err := setNestedValue(jsonData, components, value); err != nil {
-		return nil, err
-	}
-
-	return json.Marshal(jsonData)
+	return nil
 }

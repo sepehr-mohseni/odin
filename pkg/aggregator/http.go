@@ -5,9 +5,44 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
+
+// HTTPClient wraps http.Client with additional functionality
+type HTTPClient struct {
+	client *http.Client
+}
+
+// NewHTTPClient creates a new HTTP client with default settings
+func NewHTTPClient() *HTTPClient {
+	return &HTTPClient{
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+		},
+	}
+}
+
+// Get performs a GET request
+func (c *HTTPClient) Get(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	return io.ReadAll(resp.Body)
+}
 
 func (a *Aggregator) makeRequest(ctx context.Context, url, authToken string) ([]byte, error) {
 	a.logger.WithField("url", url).Info("Making HTTP request")

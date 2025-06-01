@@ -128,9 +128,11 @@ func generateCacheKey(c echo.Context) string {
 
 	if req.Body != nil && (req.Method == http.MethodPost || req.Method == http.MethodPut) {
 		if req.ContentLength > 0 && req.ContentLength < 1024*10 {
-			bodyBytes, _ := io.ReadAll(req.Body)
-			req.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
-			keyParts = append(keyParts, string(bodyBytes))
+			bodyBytes, err := io.ReadAll(req.Body)
+			if err == nil {
+				req.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+				keyParts = append(keyParts, string(bodyBytes))
+			}
 		}
 	}
 
