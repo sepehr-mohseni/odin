@@ -131,9 +131,15 @@ func (p *Proxy) ProxyWebSocket(c echo.Context, targetURL string) error {
 func (c *Connection) proxyClientToServer() {
 	defer c.close()
 
-	c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+	if err := c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+		c.proxy.logger.WithError(err).Error("Failed to set read deadline on client connection")
+		return
+	}
+
 	c.clientConn.SetPongHandler(func(string) error {
-		c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+		if err := c.clientConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+			c.proxy.logger.WithError(err).Error("Failed to set read deadline in pong handler")
+		}
 		return nil
 	})
 
@@ -151,7 +157,11 @@ func (c *Connection) proxyClientToServer() {
 			break
 		}
 
-		c.serverConn.SetWriteDeadline(time.Now().Add(c.proxy.config.WriteTimeout))
+		if err := c.serverConn.SetWriteDeadline(time.Now().Add(c.proxy.config.WriteTimeout)); err != nil {
+			c.proxy.logger.WithError(err).Error("Failed to set write deadline on server connection")
+			break
+		}
+
 		if err := c.serverConn.WriteMessage(messageType, data); err != nil {
 			c.proxy.logger.WithError(err).Error("Failed to write message to server")
 			break
@@ -162,9 +172,15 @@ func (c *Connection) proxyClientToServer() {
 func (c *Connection) proxyServerToClient() {
 	defer c.close()
 
-	c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+	if err := c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+		c.proxy.logger.WithError(err).Error("Failed to set read deadline on server connection")
+		return
+	}
+
 	c.serverConn.SetPongHandler(func(string) error {
-		c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout))
+		if err := c.serverConn.SetReadDeadline(time.Now().Add(c.proxy.config.ReadTimeout)); err != nil {
+			c.proxy.logger.WithError(err).Error("Failed to set read deadline in pong handler")
+		}
 		return nil
 	})
 
@@ -182,7 +198,11 @@ func (c *Connection) proxyServerToClient() {
 			break
 		}
 
-		c.clientConn.SetWriteDeadline(time.Now().Add(c.proxy.config.WriteTimeout))
+		if err := c.clientConn.SetWriteDeadline(time.Now().Add(c.proxy.config.WriteTimeout)); err != nil {
+			c.proxy.logger.WithError(err).Error("Failed to set write deadline on client connection")
+			break
+		}
+
 		if err := c.clientConn.WriteMessage(messageType, data); err != nil {
 			c.proxy.logger.WithError(err).Error("Failed to write message to client")
 			break

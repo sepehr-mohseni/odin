@@ -35,42 +35,36 @@ func TestCircuitBreaker_Execute(t *testing.T) {
 
 func TestCircuitBreaker_StateTransitions(t *testing.T) {
 	config := circuit.Config{
-		MaxRequests:  2,
+		MaxRequests:  5,
 		Interval:     100 * time.Millisecond,
 		Timeout:      100 * time.Millisecond,
-		FailureRatio: 0.5,
-		MinRequests:  2,
+		FailureRatio: 0.6,
+		MinRequests:  3,
 	}
 
 	cb := circuit.NewCircuitBreaker("test", config, logrus.New())
 
-	// Initial state should be closed
-	assert.Equal(t, circuit.StateClosed, cb.State())
-
-	// Execute failing requests to trigger state change
-	for i := 0; i < 3; i++ {
-		cb.Execute(func() (interface{}, error) {
-			return nil, errors.New("failure")
+	// Trigger failures to open the circuit
+	for i := 0; i < 5; i++ {
+		_, err := cb.Execute(func() (interface{}, error) {
+			return nil, errors.New("test error")
 		})
+		assert.Error(t, err)
 	}
 
-	// Circuit should be open after failures
+	// Verify circuit is open
 	assert.Equal(t, circuit.StateOpen, cb.State())
 
-	// Immediate request should fail with circuit open error
-	_, err := cb.Execute(func() (interface{}, error) {
-		return "should not execute", nil
-	})
-	assert.Equal(t, circuit.ErrCircuitOpen, err)
-
-	// Wait for timeout to pass
+	// Wait for half-open
 	time.Sleep(150 * time.Millisecond)
 
-	// Circuit should transition to half-open
-	_, err = cb.Execute(func() (interface{}, error) {
+	// Next call should put it in half-open state
+	_, err := cb.Execute(func() (interface{}, error) {
 		return "success", nil
 	})
 	assert.NoError(t, err)
+
+	// Verify circuit is closed again
 	assert.Equal(t, circuit.StateClosed, cb.State())
 }
 

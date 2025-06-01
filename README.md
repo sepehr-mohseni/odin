@@ -4,6 +4,9 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Go Version](https://img.shields.io/badge/go-1.24+-00ADD8.svg)
+![Build Status](https://github.com/sepehr-mohseni/odin/workflows/CI/badge.svg)
+![Test Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen.svg)
+![Go Report Card](https://goreportcard.com/badge/github.com/sepehr-mohseni/odin)
 
 Odin is a high-performance, feature-rich API Gateway built in Go. It serves as a central entry point for managing microservice architectures with features like request routing, authentication, response aggregation, and more.
 

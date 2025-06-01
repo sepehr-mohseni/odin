@@ -70,61 +70,52 @@ func StatusCodeFromError(err error) int {
 // ErrorHandler creates a custom error handler for Echo
 func ErrorHandler(logger *logrus.Logger) echo.HTTPErrorHandler {
 	return func(err error, c echo.Context) {
-		if c.Response().Committed {
-			return
-		}
-
-		var httpErr *HTTPError
-		var echoErr *echo.HTTPError
+		var he *HTTPError
+		var ee *echo.HTTPError
 
 		switch {
-		case errors.As(err, &httpErr):
-			// Custom HTTPError
+		case errors.As(err, &he):
 			logger.WithFields(logrus.Fields{
-				"code":    httpErr.Code,
-				"message": httpErr.Message,
-				"details": httpErr.Details,
-				"path":    c.Request().URL.Path,
 				"method":  c.Request().Method,
+				"path":    c.Request().URL.Path,
+				"code":    he.Code,
+				"message": he.Message,
+				"details": he.Details,
 			}).Error("HTTP error occurred")
 
-			c.JSON(httpErr.Code, map[string]interface{}{
-				"error":   httpErr.Message,
-				"details": httpErr.Details,
-				"code":    httpErr.Code,
-			})
-
-		case errors.As(err, &echoErr):
-			// Echo HTTPError
-			logger.WithFields(logrus.Fields{
-				"code":    echoErr.Code,
-				"message": echoErr.Message,
-				"path":    c.Request().URL.Path,
-				"method":  c.Request().Method,
-			}).Error("Echo HTTP error occurred")
-
-			message := echoErr.Message
-			if message == nil {
-				message = http.StatusText(echoErr.Code)
+			if err := c.JSON(he.Code, map[string]interface{}{
+				"error":   he.Message,
+				"details": he.Details,
+			}); err != nil {
+				logger.WithError(err).Error("Failed to write error response")
 			}
 
-			c.JSON(echoErr.Code, map[string]interface{}{
-				"error": message,
-				"code":  echoErr.Code,
-			})
+		case errors.As(err, &ee):
+			logger.WithFields(logrus.Fields{
+				"method":  c.Request().Method,
+				"path":    c.Request().URL.Path,
+				"code":    ee.Code,
+				"message": ee.Message,
+			}).Error("Echo HTTP error occurred")
+
+			if err := c.JSON(ee.Code, map[string]interface{}{
+				"error": ee.Message,
+			}); err != nil {
+				logger.WithError(err).Error("Failed to write error response")
+			}
 
 		default:
-			// Generic error
 			logger.WithFields(logrus.Fields{
-				"error":  err.Error(),
-				"path":   c.Request().URL.Path,
 				"method": c.Request().Method,
+				"path":   c.Request().URL.Path,
+				"error":  err.Error(),
 			}).Error("Unhandled error occurred")
 
-			c.JSON(http.StatusInternalServerError, map[string]interface{}{
-				"error": "Internal Server Error",
-				"code":  http.StatusInternalServerError,
-			})
+			if err := c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"error": "Internal server error",
+			}); err != nil {
+				logger.WithError(err).Error("Failed to write error response")
+			}
 		}
 	}
 }

@@ -21,7 +21,19 @@ test-coverage:
 	@echo "Running tests with coverage..."
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
+	go tool cover -func=coverage.out | grep total | awk '{print "Total coverage: " $$3}'
 	@echo "Coverage report generated: coverage.html"
+
+coverage-badge:
+	@echo "Generating coverage badge..."
+	@COVERAGE=$$(go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//'); \
+	echo "Coverage: $$COVERAGE%"; \
+	if [ $$(echo "$$COVERAGE >= 80" | bc -l) -eq 1 ]; then \
+		echo "Coverage is good ($$COVERAGE% >= 80%)"; \
+	else \
+		echo "Coverage is below threshold ($$COVERAGE% < 80%)"; \
+		exit 1; \
+	fi
 
 test-unit:
 	@echo "Running unit tests..."
