@@ -135,3 +135,17 @@ help:
 	@echo "  install-tools         - Install development tools"
 	@echo "  benchmark             - Run performance benchmarks"
 	@echo "  security-scan         - Run security analysis"
+
+ci-local:
+	@echo "Running local CI simulation..."
+	@./scripts/ci-local.sh
+
+ci-quick:
+	@echo "Quick CI check..."
+	@go mod verify
+	@go build ./...
+	@go test ./...
+	@golangci-lint run --fast
+
+pre-commit: ci-quick
+	@echo "Pre-commit checks passed!"

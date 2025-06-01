@@ -186,97 +186,6 @@ func (rb *RandomBalancer) NextTarget() *url.URL {
 	return rb.targets[rand.Intn(len(rb.targets))]
 }
 
-// Apply transformation rule to data
-func applyTransformation(data map[string]interface{}, rule config.TransformRule) {
-	fromParts := strings.Split(strings.TrimPrefix(rule.From, "$."), ".")
-	toParts := strings.Split(strings.TrimPrefix(rule.To, "$."), ".")
-
-	sourceValue := getNestedValue(data, fromParts)
-
-	if sourceValue == nil && rule.Default != "" {
-		sourceValue = rule.Default
-	}
-
-	if sourceValue != nil {
-		setNestedValue(data, toParts, sourceValue)
-	}
-}
-
-// Get a nested value from a nested map using path
-func getNestedValue(data map[string]interface{}, path []string) interface{} {
-	if len(path) == 0 {
-		return nil
-	}
-
-	currentMap := data
-	for i, key := range path {
-		if i == len(path)-1 {
-			return currentMap[key]
-		}
-
-		nextMap, ok := currentMap[key].(map[string]interface{})
-		if !ok {
-			return nil
-		}
-		currentMap = nextMap
-	}
-
-	return nil
-}
-
-// Set a nested value in a nested map using path
-func setNestedValue(data map[string]interface{}, path []string, value interface{}) {
-	if len(path) == 0 {
-		return
-	}
-
-	currentMap := data
-	for i, key := range path {
-		if i == len(path)-1 {
-			currentMap[key] = value
-			return
-		}
-
-		if nextMap, ok := currentMap[key].(map[string]interface{}); ok {
-			currentMap = nextMap
-		} else {
-			newMap := make(map[string]interface{})
-			currentMap[key] = newMap
-			currentMap = newMap
-		}
-	}
-}
-
-func (h *Handler) createProxyRequest(c echo.Context, targetURL string) (*http.Request, error) {
-	var body io.Reader = nil
-
-	if c.Request().Body != nil {
-		bodyBytes, err := io.ReadAll(c.Request().Body)
-		if err != nil {
-			return nil, err
-		}
-		c.Request().Body = io.NopCloser(bytes.NewReader(bodyBytes))
-		body = bytes.NewReader(bodyBytes)
-	}
-
-	req, err := http.NewRequest(c.Request().Method, targetURL, body)
-	if err != nil {
-		return nil, err
-	}
-
-	for k, vals := range c.Request().Header {
-		for _, v := range vals {
-			req.Header.Add(k, v)
-		}
-	}
-
-	for k, v := range h.service.Headers {
-		req.Header.Set(k, v)
-	}
-
-	return req, nil
-}
-
 func (h *Handler) handleAggregation(c echo.Context, responseBody []byte) ([]byte, error) {
 	if h.service.Aggregation == nil {
 		return responseBody, nil
@@ -346,7 +255,6 @@ func (h *Handler) fetchDependencyData(c echo.Context, dep config.DependencyConfi
 }
 
 func (h *Handler) buildDependencyURL(c echo.Context, dep config.DependencyConfig) string {
-	// Start with the dependency path
 	targetURL := dep.Path
 
 	// Replace parameters in the URL using request context
@@ -354,10 +262,10 @@ func (h *Handler) buildDependencyURL(c echo.Context, dep config.DependencyConfig
 		paramName := strings.TrimPrefix(mapping.To, "{")
 		paramName = strings.TrimSuffix(paramName, "}")
 
-		// Get parameter value from request context
-		paramValue := c.QueryParam(paramName)
+		// Get parameter value from request
+		paramValue := c.Param(paramName)
 		if paramValue == "" {
-			paramValue = c.Param(paramName)
+			paramValue = c.QueryParam(paramName)
 		}
 
 		if paramValue != "" {
@@ -368,30 +276,21 @@ func (h *Handler) buildDependencyURL(c echo.Context, dep config.DependencyConfig
 	return targetURL
 }
 
-func (h *Handler) copyHeaders(srcReq *http.Request, destReq *http.Request, paramMappings []config.MappingConfig) {
-	// Copy standard headers
-	headersToForward := []string{
-		"Authorization",
-		"Content-Type",
-		"Accept",
-		"User-Agent",
-		"X-Forwarded-For",
-		"X-Real-IP",
-	}
-
-	for _, header := range headersToForward {
-		if value := srcReq.Header.Get(header); value != "" {
-			destReq.Header.Set(header, value)
+func (h *Handler) copyHeaders(from *http.Request, to *http.Request, mappings []config.MappingConfig) {
+	// Copy relevant headers from original request
+	for k, vals := range from.Header {
+		for _, v := range vals {
+			to.Header.Add(k, v)
 		}
 	}
 
-	// Apply header mappings from parameter configuration
-	for _, mapping := range paramMappings {
-		if strings.HasPrefix(mapping.From, "$.headers.") {
-			headerName := strings.TrimPrefix(mapping.From, "$.headers.")
-			if value := srcReq.Header.Get(headerName); value != "" {
-				destReq.Header.Set(mapping.To, value)
-			}
+	// Apply header mappings if specified
+	for _, mapping := range mappings {
+		fromHeader := strings.TrimPrefix(mapping.From, "header:")
+		toHeader := strings.TrimPrefix(mapping.To, "header:")
+
+		if fromValue := from.Header.Get(fromHeader); fromValue != "" {
+			to.Header.Set(toHeader, fromValue)
 		}
 	}
 }
@@ -401,7 +300,7 @@ func (h *Handler) mapDependencyResponse(data interface{}, mappings []config.Mapp
 		return data
 	}
 
-	// Convert to map for easier manipulation
+	// Convert data to map for processing
 	dataMap, ok := data.(map[string]interface{})
 	if !ok {
 		return data
@@ -409,22 +308,23 @@ func (h *Handler) mapDependencyResponse(data interface{}, mappings []config.Mapp
 
 	result := make(map[string]interface{})
 
-	// Apply each mapping
+	// Apply mappings
 	for _, mapping := range mappings {
 		fromPath := strings.TrimPrefix(mapping.From, "$.")
 		toPath := strings.TrimPrefix(mapping.To, "$.")
 
-		// If from path is root ($), copy entire object
-		if mapping.From == "$" {
-			if toPath == "" {
+		// Extract value from source
+		if fromPath == "" || fromPath == "$" {
+			// Map entire object
+			if toPath == "" || toPath == "$" {
 				return dataMap
 			}
 			setNestedValue(result, strings.Split(toPath, "."), dataMap)
 		} else {
-			// Extract value from source path
-			value := getNestedValue(dataMap, strings.Split(fromPath, "."))
-			if value != nil {
-				if toPath == "" {
+			// Extract specific field
+			value, found := getNestedValue(dataMap, strings.Split(fromPath, "."))
+			if found {
+				if toPath == "" || toPath == "$" {
 					return value
 				}
 				setNestedValue(result, strings.Split(toPath, "."), value)
@@ -432,10 +332,61 @@ func (h *Handler) mapDependencyResponse(data interface{}, mappings []config.Mapp
 		}
 	}
 
-	// If no mappings resulted in data, return original
 	if len(result) == 0 {
 		return dataMap
 	}
 
 	return result
+}
+
+// getNestedValue extracts a value from nested map using dot notation
+func getNestedValue(data map[string]interface{}, path []string) (interface{}, bool) {
+	current := data
+
+	for i, key := range path {
+		if i == len(path)-1 {
+			value, exists := current[key]
+			return value, exists
+		}
+
+		next, exists := current[key]
+		if !exists {
+			return nil, false
+		}
+
+		nextMap, ok := next.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+
+		current = nextMap
+	}
+
+	return nil, false
+}
+
+// setNestedValue sets a value in nested map using dot notation
+func setNestedValue(data map[string]interface{}, path []string, value interface{}) {
+	current := data
+
+	for i, key := range path {
+		if i == len(path)-1 {
+			current[key] = value
+			return
+		}
+
+		next, exists := current[key]
+		if !exists {
+			next = make(map[string]interface{})
+			current[key] = next
+		}
+
+		nextMap, ok := next.(map[string]interface{})
+		if !ok {
+			nextMap = make(map[string]interface{})
+			current[key] = nextMap
+		}
+
+		current = nextMap
+	}
 }

@@ -1,0 +1,8 @@
+*.go linguist-language=Go
+*.html linguist-vendored
+*.css linguist-vendored
+*.js linguist-vendored
+test/services/* linguist-vendored
+pkg/admin/templates/* linguist-vendored
+coverage.html linguist-generated
+*.md linguist-documentation

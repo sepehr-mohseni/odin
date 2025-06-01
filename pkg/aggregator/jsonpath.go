@@ -128,7 +128,11 @@ func (a *Aggregator) parseJSONPathExpression(path string) *JSONPathExpressionDat
 
 	indexPattern := regexp.MustCompile(`^(.+)\[(\d+)\]\.(.+)$`)
 	if matches := indexPattern.FindStringSubmatch(path); matches != nil {
-		index, _ := strconv.Atoi(matches[2])
+		index, err := strconv.Atoi(matches[2])
+		if err != nil {
+			a.logger.WithError(err).Error("Failed to parse index in JSONPath expression")
+			return nil
+		}
 		return &JSONPathExpressionData{
 			arrayName:      matches[1],
 			expressionType: "index",

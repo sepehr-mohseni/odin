@@ -10,38 +10,35 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// HTTPClient wraps http.Client with additional functionality
 type HTTPClient struct {
-	client *http.Client
+	client  *http.Client
+	timeout time.Duration
 }
 
 // NewHTTPClient creates a new HTTP client with default settings
-func NewHTTPClient() *HTTPClient {
+func NewHTTPClient(timeout time.Duration) *HTTPClient {
 	return &HTTPClient{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: timeout,
 		},
+		timeout: timeout,
 	}
 }
 
-// Get performs a GET request
-func (c *HTTPClient) Get(ctx context.Context, url string, headers map[string]string) ([]byte, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
+// Do performs an HTTP request
+func (h *HTTPClient) Do(req *http.Request) (*http.Response, error) {
+	return h.client.Do(req)
+}
 
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
+// DoWithContext performs an HTTP request with the given context
+func (h *HTTPClient) DoWithContext(ctx context.Context, req *http.Request) (*http.Response, error) {
+	req = req.WithContext(ctx)
+	return h.client.Do(req)
+}
 
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	return io.ReadAll(resp.Body)
+// BuildURL constructs a URL from the base URL and path
+func (h *HTTPClient) BuildURL(baseURL, path string) string {
+	return fmt.Sprintf("%s%s", baseURL, path)
 }
 
 func (a *Aggregator) makeRequest(ctx context.Context, url, authToken string) ([]byte, error) {
