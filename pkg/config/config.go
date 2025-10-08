@@ -18,6 +18,7 @@ type Config struct {
 	Cache      CacheConfig      `yaml:"cache"`
 	Monitoring MonitoringConfig `yaml:"monitoring"`
 	Admin      AdminConfig      `yaml:"admin"`
+	Plugins    PluginsConfig    `yaml:"plugins"`
 	Services   []ServiceConfig  `yaml:"services"`
 }
 
@@ -46,6 +47,20 @@ type AdminConfig struct {
 	Enabled  bool   `yaml:"enabled"`
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+}
+
+type PluginsConfig struct {
+	Enabled   bool           `yaml:"enabled"`
+	Directory string         `yaml:"directory"`
+	Plugins   []PluginConfig `yaml:"plugins"`
+}
+
+type PluginConfig struct {
+	Name    string                 `yaml:"name"`
+	Path    string                 `yaml:"path"`
+	Enabled bool                   `yaml:"enabled"`
+	Config  map[string]interface{} `yaml:"config"`
+	Hooks   []string               `yaml:"hooks"` // pre-request, post-request, pre-response, post-response
 }
 
 type RateLimitConfig struct {
@@ -80,8 +95,11 @@ type ServiceConfig struct {
 	Authentication bool               `yaml:"authentication"`
 	LoadBalancing  string             `yaml:"loadBalancing"`
 	Headers        map[string]string  `yaml:"headers"`
+	Protocol       string             `yaml:"protocol"` // http, graphql, grpc
 	Transform      TransformConfig    `yaml:"transform"`
 	Aggregation    *AggregationConfig `yaml:"aggregation,omitempty"`
+	GraphQL        *GraphQLConfig     `yaml:"graphql,omitempty"`
+	GRPC           *GRPCConfig        `yaml:"grpc,omitempty"`
 }
 
 type TransformConfig struct {
@@ -97,6 +115,24 @@ type TransformRule struct {
 
 type AggregationConfig struct {
 	Dependencies []DependencyConfig `yaml:"dependencies"`
+}
+
+type GraphQLConfig struct {
+	MaxQueryDepth       int           `yaml:"maxQueryDepth"`
+	MaxQueryComplexity  int           `yaml:"maxQueryComplexity"`
+	EnableIntrospection bool          `yaml:"enableIntrospection"`
+	EnableQueryCaching  bool          `yaml:"enableQueryCaching"`
+	CacheTTL            time.Duration `yaml:"cacheTTL"`
+}
+
+type GRPCConfig struct {
+	ProtoFiles       []string `yaml:"protoFiles"`
+	ImportPaths      []string `yaml:"importPaths"`
+	EnableReflection bool     `yaml:"enableReflection"`
+	MaxMessageSize   int      `yaml:"maxMessageSize"`
+	EnableTLS        bool     `yaml:"enableTLS"`
+	TLSCertFile      string   `yaml:"tlsCertFile"`
+	TLSKeyFile       string   `yaml:"tlsKeyFile"`
 }
 
 type DependencyConfig struct {
@@ -124,6 +160,9 @@ func (s *ServiceConfig) SetDefaults() {
 	}
 	if s.RetryDelay == 0 {
 		s.RetryDelay = 1 * time.Second
+	}
+	if s.Protocol == "" {
+		s.Protocol = "http"
 	}
 }
 

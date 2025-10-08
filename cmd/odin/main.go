@@ -58,6 +58,55 @@ func main() {
 		}
 	}
 
+	// Log enabled features
+	features := []string{"HTTP routing"}
+
+	if cfg.Plugins.Enabled {
+		features = append(features, "plugin system")
+	}
+
+	httpServices := 0
+	graphqlServices := 0
+	grpcServices := 0
+
+	for _, svc := range cfg.Services {
+		switch svc.Protocol {
+		case "graphql":
+			graphqlServices++
+		case "grpc":
+			grpcServices++
+		default:
+			httpServices++
+		}
+	}
+
+	if graphqlServices > 0 {
+		features = append(features, fmt.Sprintf("GraphQL proxy (%d services)", graphqlServices))
+	}
+
+	if grpcServices > 0 {
+		features = append(features, fmt.Sprintf("gRPC proxy (%d services)", grpcServices))
+	}
+
+	if cfg.Auth.JWTSecret != "" || len(cfg.Auth.IgnorePathRegexes) > 0 {
+		features = append(features, "JWT authentication")
+	}
+
+	if cfg.Cache.Enabled {
+		features = append(features, "response caching")
+	}
+
+	if cfg.RateLimit.Enabled {
+		features = append(features, "rate limiting")
+	}
+
+	if cfg.Monitoring.Enabled {
+		features = append(features, "Prometheus metrics")
+	}
+
+	logger.Infof("Enabled features: %v", features)
+	logger.Infof("Services configured: %d HTTP, %d GraphQL, %d gRPC", httpServices, graphqlServices, grpcServices)
+
 	gw, err := gateway.New(cfg, configPath, logger)
 	if err != nil {
 		logger.Fatalf("Failed to initialize gateway: %v", err)

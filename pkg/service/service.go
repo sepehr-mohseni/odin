@@ -19,6 +19,7 @@ type Config struct {
 	Authentication bool              `yaml:"authentication"`
 	LoadBalancing  string            `yaml:"loadBalancing"`
 	Headers        map[string]string `yaml:"headers"`
+	Protocol       string            `yaml:"protocol"`
 	Transform      struct {
 		Request  []TransformRule `yaml:"request"`
 		Response []TransformRule `yaml:"response"`

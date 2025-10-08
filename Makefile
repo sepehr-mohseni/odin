@@ -59,7 +59,7 @@ lint:
 	@echo "Running linter..."
 	golangci-lint run ./...
 
-clean:
+clean: clean-plugins
 	@echo "Cleaning up..."
 	rm -rf bin/
 	rm -f coverage.out coverage.html
@@ -111,6 +111,18 @@ security-scan:
 	@echo "Running security scan..."
 	gosec ./...
 
+build-plugins:
+	@echo "Building example plugins..."
+	@mkdir -p plugins
+	go build -buildmode=plugin -o plugins/request_logger.so examples/plugins/request_logger.go
+
+clean-plugins:
+	@echo "Cleaning plugin artifacts..."
+	rm -rf plugins/*.so
+
+build-all: build build-plugins
+	@echo "Built gateway and plugins successfully"
+
 help:
 	@echo "Odin API Gateway Make commands:"
 	@echo "  build                 - Build the binary"
@@ -135,6 +147,9 @@ help:
 	@echo "  install-tools         - Install development tools"
 	@echo "  benchmark             - Run performance benchmarks"
 	@echo "  security-scan         - Run security analysis"
+	@echo "  build-plugins         - Build example plugins"
+	@echo "  clean-plugins         - Clean plugin artifacts"
+	@echo "  build-all             - Build gateway and plugins"
 
 ci-local:
 	@echo "Running local CI simulation..."

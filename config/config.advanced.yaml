@@ -1,0 +1,91 @@
+server:
+  port: 8080
+  readTimeout: 5s
+  writeTimeout: 10s
+  gracefulTimeout: 15s
+  compression: true
+
+logging:
+  level: info
+  json: false
+
+auth:
+  accessTokenTTL: 1h0m0s
+  refreshTokenTTL: 24h0m0s
+  ignorePathRegexes:
+    - ^/health$
+    - ^/metrics$
+    - ^/aggregate$
+    - ^/admin/?.*$
+    - ^/graphql/?.*$
+    - ^/grpc/?.*$
+
+plugins:
+  enabled: true
+  directory: "./plugins"
+  plugins:
+    - name: "request_logger"
+      path: "./plugins/request_logger.so"
+      enabled: true
+      hooks: ["pre-request", "post-response"]
+      config:
+        log_level: "info"
+        include_headers: true
+    - name: "rate_limiter"
+      path: "./plugins/rate_limiter.so"  
+      enabled: false
+      hooks: ["pre-request"]
+      config:
+        requests_per_minute: 100
+
+rateLimit:
+  enabled: true
+  limit: 100
+  duration: 1m0s
+  strategy: local
+
+cache:
+  enabled: true
+  ttl: 5m0s
+  strategy: local
+  maxSizeInMB: 100
+
+monitoring:
+  enabled: true
+  path: /metrics
+
+services:
+  # Traditional HTTP service
+  - name: users
+    basePath: /api/users
+    protocol: http
+    targets:
+      - http://localhost:8081
+    authentication: true
+    loadBalancing: round-robin
+
+  # GraphQL service
+  - name: graphql-api
+    basePath: /graphql
+    protocol: graphql
+    targets:
+      - http://localhost:4000/graphql
+    authentication: false
+    graphql:
+      maxQueryDepth: 10
+      maxQueryComplexity: 1000
+      enableIntrospection: true
+      enableQueryCaching: true
+      cacheTTL: 5m0s
+
+  # gRPC service
+  - name: user-grpc
+    basePath: /grpc/users
+    protocol: grpc
+    targets:
+      - localhost:50051
+    authentication: true
+    grpc:
+      enableReflection: true
+      maxMessageSize: 4194304  # 4MB
+      enableTLS: false

@@ -33,14 +33,20 @@ func (r *Router) SetAuthMiddleware(middleware echo.MiddlewareFunc) {
 }
 
 func (r *Router) RegisterRoutes() error {
-	// Register service routes
+	// Register HTTP service routes (GraphQL and gRPC are handled separately)
 	services := r.registry.GetAllServices()
 
 	for _, svc := range services {
+		// Skip non-HTTP services as they have their own handlers
+		if svc.Protocol != "" && svc.Protocol != "http" {
+			continue
+		}
+
 		r.logger.WithFields(logrus.Fields{
 			"name":     svc.Name,
 			"basePath": svc.BasePath,
-		}).Info("Registering service route")
+			"protocol": svc.Protocol,
+		}).Info("Registering HTTP service route")
 
 		// Create service handler
 		handler, err := NewServiceHandler(svc, r.logger, r.cacheStore)

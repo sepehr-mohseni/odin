@@ -34,12 +34,29 @@ func main() {
 	logging.ConfigureLogger(log, loggingConfig)
 
 	for _, svc := range cfg.Services {
-		log.WithFields(logrus.Fields{
+		fields := logrus.Fields{
 			"name":           svc.Name,
 			"base_path":      svc.BasePath,
 			"targets":        svc.Targets,
 			"authentication": svc.Authentication,
-		}).Info("Loaded service configuration")
+			"protocol":       svc.Protocol,
+		}
+
+		// Add protocol-specific information
+		switch svc.Protocol {
+		case "graphql":
+			if svc.GraphQL != nil {
+				fields["introspection"] = svc.GraphQL.EnableIntrospection
+				fields["query_caching"] = svc.GraphQL.EnableQueryCaching
+			}
+		case "grpc":
+			if svc.GRPC != nil {
+				fields["grpc_reflection"] = svc.GRPC.EnableReflection
+				fields["grpc_tls"] = svc.GRPC.EnableTLS
+			}
+		}
+
+		log.WithFields(fields).Info("Loaded service configuration")
 
 		if svc.Aggregation != nil {
 			for _, dep := range svc.Aggregation.Dependencies {
@@ -48,6 +65,24 @@ func main() {
 					"depends_on": dep.Service,
 					"path":       dep.Path,
 				}).Info("Service has dependency")
+			}
+		}
+	}
+
+	// Log plugin configuration
+	if cfg.Plugins.Enabled {
+		log.WithFields(logrus.Fields{
+			"plugin_count": len(cfg.Plugins.Plugins),
+			"directory":    cfg.Plugins.Directory,
+		}).Info("Plugin system enabled")
+
+		for _, plugin := range cfg.Plugins.Plugins {
+			if plugin.Enabled {
+				log.WithFields(logrus.Fields{
+					"name":  plugin.Name,
+					"path":  plugin.Path,
+					"hooks": plugin.Hooks,
+				}).Info("Plugin configured")
 			}
 		}
 	}

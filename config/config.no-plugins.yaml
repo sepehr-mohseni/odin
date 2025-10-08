@@ -1,0 +1,59 @@
+server:
+  host: "localhost"  
+  port: 8080
+
+services:
+  # HTTP service
+  - name: users
+    basePath: /api/users
+    protocol: http
+    targets:
+      - http://localhost:8081
+    authentication: true
+
+  # GraphQL service
+  - name: graphql-api
+    basePath: /graphql
+    protocol: graphql
+    targets:
+      - http://localhost:4000/graphql
+    authentication: false
+    graphql:
+      maxQueryDepth: 10
+      maxQueryComplexity: 1000
+      enableIntrospection: true
+      enableQueryCaching: true
+      cacheTTL: 5m0s
+
+  # gRPC service
+  - name: user-grpc
+    basePath: /grpc/users
+    protocol: grpc
+    targets:
+      - localhost:50051
+    authentication: true
+    grpc:
+      timeout: 30s
+      maxReceiveMessageSize: 4194304
+      maxSendMessageSize: 4194304
+
+auth:
+  jwt:
+    secret: "your-secret-key-here"
+    expiration: 24h
+
+caching:
+  enabled: true
+  strategy: memory
+  ttl: 10m
+
+rateLimit:
+  enabled: true
+  limit: 100
+  duration: 1m
+  strategy: "sliding-window"
+
+monitoring:
+  metrics:
+    enabled: true
+    path: "/metrics"

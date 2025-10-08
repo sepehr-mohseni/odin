@@ -10,10 +10,13 @@ import (
 	"odin/pkg/auth"
 	"odin/pkg/cache"
 	"odin/pkg/config"
+	"odin/pkg/graphql"
+	"odin/pkg/grpc"
 	"odin/pkg/health"
 	"odin/pkg/logging"
 	"odin/pkg/middleware"
 	"odin/pkg/monitoring"
+	"odin/pkg/plugins"
 	"odin/pkg/routing"
 	"odin/pkg/service"
 
@@ -29,6 +32,7 @@ type Gateway struct {
 	adminHandler    *admin.AdminHandler
 	serviceRegistry *service.Registry
 	router          *routing.Router
+	pluginManager   *plugins.PluginManager
 }
 
 func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway, error) {
@@ -59,6 +63,7 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 			Authentication: svcConfig.Authentication,
 			LoadBalancing:  svcConfig.LoadBalancing,
 			Headers:        svcConfig.Headers,
+			Protocol:       svcConfig.Protocol,
 		}
 
 		svc.Transform.Request = make([]service.TransformRule, len(svcConfig.Transform.Request))
@@ -121,6 +126,20 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 
 	adminHandler := admin.New(cfg, configPath, logger)
 
+	// Initialize plugin manager
+	pluginManager := plugins.NewPluginManager(logger)
+
+	// Load plugins if enabled
+	if cfg.Plugins.Enabled {
+		for _, pluginCfg := range cfg.Plugins.Plugins {
+			if pluginCfg.Enabled {
+				if err := pluginManager.LoadPlugin(pluginCfg.Name, pluginCfg.Path, pluginCfg.Config, pluginCfg.Hooks); err != nil {
+					logger.WithError(err).Warnf("Failed to load plugin %s", pluginCfg.Name)
+				}
+			}
+		}
+	}
+
 	gateway := &Gateway{
 		server:          e,
 		config:          cfg,
@@ -128,6 +147,47 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 		adminHandler:    adminHandler,
 		serviceRegistry: registry,
 		router:          router,
+		pluginManager:   pluginManager,
+	}
+
+	// Setup protocol-specific proxies
+	for _, svcConfig := range cfg.Services {
+		switch svcConfig.Protocol {
+		case "graphql":
+			if svcConfig.GraphQL != nil && len(svcConfig.Targets) > 0 {
+				graphqlConfig := &graphql.ProxyConfig{
+					Endpoint:            svcConfig.Targets[0],
+					MaxQueryDepth:       svcConfig.GraphQL.MaxQueryDepth,
+					MaxQueryComplexity:  svcConfig.GraphQL.MaxQueryComplexity,
+					EnableIntrospection: svcConfig.GraphQL.EnableIntrospection,
+					Timeout:             svcConfig.Timeout,
+					EnableQueryCaching:  svcConfig.GraphQL.EnableQueryCaching,
+					CacheTTL:            svcConfig.GraphQL.CacheTTL,
+				}
+				graphqlProxy := graphql.NewProxy(graphqlConfig, logger)
+				graphqlProxy.RegisterRoutes(e, svcConfig.BasePath)
+				logger.WithField("service", svcConfig.Name).Info("GraphQL proxy registered")
+			}
+		case "grpc":
+			if svcConfig.GRPC != nil && len(svcConfig.Targets) > 0 {
+				grpcConfig := &grpc.ProxyConfig{
+					Target:           svcConfig.Targets[0],
+					MaxMessageSize:   svcConfig.GRPC.MaxMessageSize,
+					Timeout:          svcConfig.Timeout,
+					EnableTLS:        svcConfig.GRPC.EnableTLS,
+					TLSCertFile:      svcConfig.GRPC.TLSCertFile,
+					TLSKeyFile:       svcConfig.GRPC.TLSKeyFile,
+					EnableReflection: svcConfig.GRPC.EnableReflection,
+				}
+				grpcProxy, err := grpc.NewProxy(grpcConfig, logger)
+				if err != nil {
+					logger.WithError(err).Warnf("Failed to create gRPC proxy for service %s", svcConfig.Name)
+				} else {
+					grpcProxy.RegisterRoutes(e, svcConfig.BasePath)
+					logger.WithField("service", svcConfig.Name).Info("gRPC proxy registered")
+				}
+			}
+		}
 	}
 
 	logging.ConfigureLoggerLegacy(logger, cfg.Logging.Level, cfg.Logging.JSON)
@@ -156,6 +216,12 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 
 	if cfg.Server.Compression {
 		e.Use(echomw.Gzip())
+	}
+
+	// Add plugin middleware if plugins are enabled
+	if cfg.Plugins.Enabled {
+		e.Use(pluginManager.PluginMiddleware())
+		logger.Info("Plugin middleware enabled")
 	}
 
 	authMiddleware := auth.NewJWTMiddleware(cfg.Auth)

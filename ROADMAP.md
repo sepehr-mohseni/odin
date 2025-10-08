@@ -4,10 +4,6 @@ This document outlines the planned future development for the Odin API Gateway p
 
 
 ## Medium-term Goals (3-6 months)
-
-- [ ] Add GraphQL proxy support
-- [ ] Develop plugin system for extending gateway functionality
-- [ ] Add gRPC protocol support
 - [ ] Implement distributed tracing with OpenTelemetry
 - [ ] Create comprehensive dashboard for real-time monitoring
 - [ ] Support for canary deployments
@@ -44,3 +40,6 @@ This document outlines the planned future development for the Odin API Gateway p
 - [x] Create Helm chart for Kubernetes deployment
 - [x] Implement request/response caching strategies
 - [x] Add API rate limiting per user/key
+- [x] Add GraphQL proxy support with query validation and caching
+- [x] Develop flexible plugin system for extending gateway functionality
+- [x] Add gRPC protocol support with HTTP-to-gRPC transcoding

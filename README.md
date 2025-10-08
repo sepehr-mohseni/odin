@@ -45,6 +45,9 @@ _A lightning-fast, feature-rich API Gateway built with Go_
 - **🔄 Request/Response Transformation** - JSONPath-based data mapping
 - **🏗️ Service Discovery** - Dynamic service registration
 - **📝 API Documentation** - Auto-generated OpenAPI specs
+- **🧩 Plugin System** - Extensible architecture with custom plugins
+- **📊 GraphQL Proxy** - Query validation, caching, and security
+- **⚡ gRPC Support** - HTTP-to-gRPC transcoding
 
 </td>
 </tr>
