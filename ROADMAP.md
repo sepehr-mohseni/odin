@@ -5,15 +5,11 @@ This document outlines the planned future development for the Odin API Gateway p
 ## Long-term Goals (6-12 months)
 
 - [ ] Add AI-powered traffic analysis and anomaly detection using dockerized grok 1 open release "https://github.com/xai-org/grok-1"
-- [ ] Support for WebAssembly extensions
-- [ ] Multi-cluster deployment and management
-- [ ] Automated API documentation generation
-- [ ] Ability to add service information based on openapi json file collection import
-- [ ] Ability to add Go plugin and register as middleware from admin panel
+- [ ] Ability to add Go plugin and register as middleware from admin panel similar to Traefik api gateway plugin registration
 - [ ] Integration with popular API management platforms like Postman API Platform and Amazon API Gateway
 - [ ] Add MongoDB for storing all the information for config, services, monitoring and other stuff and move every movable stuff into mongodb. store other gateway specific configs inside one unified yaml file
 - [ ] Refactor to a better structured html templates with good coding
-- [ ] Add all the abilities to frontend admin panel to manage all o the gateway setting and monitoring from the admin panel (based on already implemented goals and features and help of files in docs folder)
+- [ ] Add all the abilities to frontend admin panel to manage all o the gateway setting and monitoring from the admin panel (based on already implemented goals and features and help of files in docs folder and other document readme and roadmap and files and codes)
 - [ ] Upgrade to latest Go version and packages
 
 ## Recently Completed Goals
@@ -48,3 +44,7 @@ This document outlines the planned future development for the Odin API Gateway p
 - [x] Enhance tracing with trace visualization UI
 - [x] Add service health monitoring and alerting
 - [x] Develop service mesh integration (Supports Istio, Linkerd, Consul Connect with mTLS, service discovery, and automatic header injection)
+- [x] Support for WebAssembly extensions (Dynamic plugin loading with wazero runtime, supports request/response transformation, auth, rate limiting, and custom middleware)
+- [x] Multi-cluster deployment and management (Cross-cluster routing, health monitoring, failover, weighted load balancing, and session affinity)
+- [x] Automated API documentation generation (OpenAPI 3.0 spec generation from service configs with auto-discovery)
+- [x] Ability to add service information based on openapi json file collection import (Import OpenAPI/Swagger specs to auto-generate service configurations)

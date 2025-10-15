@@ -11,17 +11,20 @@ import (
 )
 
 type Config struct {
-	Server      ServerConfig      `yaml:"server"`
-	Logging     LoggingConfig     `yaml:"logging"`
-	Auth        AuthConfig        `yaml:"auth"`
-	RateLimit   RateLimitConfig   `yaml:"rateLimit"`
-	Cache       CacheConfig       `yaml:"cache"`
-	Monitoring  MonitoringConfig  `yaml:"monitoring"`
-	Admin       AdminConfig       `yaml:"admin"`
-	Plugins     PluginsConfig     `yaml:"plugins"`
-	Tracing     TracingConfig     `yaml:"tracing"`
-	Services    []ServiceConfig   `yaml:"services"`
-	ServiceMesh ServiceMeshConfig `yaml:"serviceMesh"`
+	Server       ServerConfig       `yaml:"server"`
+	Logging      LoggingConfig      `yaml:"logging"`
+	Auth         AuthConfig         `yaml:"auth"`
+	RateLimit    RateLimitConfig    `yaml:"rateLimit"`
+	Cache        CacheConfig        `yaml:"cache"`
+	Monitoring   MonitoringConfig   `yaml:"monitoring"`
+	Admin        AdminConfig        `yaml:"admin"`
+	Plugins      PluginsConfig      `yaml:"plugins"`
+	Tracing      TracingConfig      `yaml:"tracing"`
+	Services     []ServiceConfig    `yaml:"services"`
+	ServiceMesh  ServiceMeshConfig  `yaml:"serviceMesh"`
+	WASM         WASMConfig         `yaml:"wasm"`
+	MultiCluster MultiClusterConfig `yaml:"multiCluster"`
+	OpenAPI      OpenAPIConfig      `yaml:"openapi"`
 }
 
 type ServerConfig struct {
@@ -134,6 +137,87 @@ type ConsulMeshConfig struct {
 	Datacenter    string `yaml:"datacenter"`
 	Token         string `yaml:"token"`
 	EnableConnect bool   `yaml:"enableConnect"`
+}
+
+type WASMConfig struct {
+	Enabled        bool               `yaml:"enabled"`
+	PluginDir      string             `yaml:"pluginDir"`
+	Plugins        []WASMPluginConfig `yaml:"plugins"`
+	MaxMemoryPages int                `yaml:"maxMemoryPages"`
+	MaxInstances   int                `yaml:"maxInstances"`
+	CacheEnabled   bool               `yaml:"cacheEnabled"`
+}
+
+type WASMPluginConfig struct {
+	Name        string                 `yaml:"name"`
+	Path        string                 `yaml:"path"`
+	Type        string                 `yaml:"type"` // request, response, auth, ratelimit, middleware, aggregation
+	Enabled     bool                   `yaml:"enabled"`
+	Priority    int                    `yaml:"priority"`
+	Config      map[string]interface{} `yaml:"config"`
+	Timeout     time.Duration          `yaml:"timeout"`
+	AllowedURLs []string               `yaml:"allowedUrls"`
+	Services    []string               `yaml:"services"`
+}
+
+type MultiClusterConfig struct {
+	Enabled          bool            `yaml:"enabled"`
+	LocalCluster     string          `yaml:"localCluster"`
+	Clusters         []ClusterConfig `yaml:"clusters"`
+	FailoverStrategy string          `yaml:"failoverStrategy"`
+	SyncInterval     time.Duration   `yaml:"syncInterval"`
+	LoadBalancing    string          `yaml:"loadBalancing"`
+	AffinityEnabled  bool            `yaml:"affinityEnabled"`
+	AffinityTTL      time.Duration   `yaml:"affinityTTL"`
+}
+
+type ClusterConfig struct {
+	Name        string             `yaml:"name"`
+	Endpoint    string             `yaml:"endpoint"`
+	Region      string             `yaml:"region"`
+	Zone        string             `yaml:"zone"`
+	Priority    int                `yaml:"priority"`
+	Weight      int                `yaml:"weight"`
+	Enabled     bool               `yaml:"enabled"`
+	HealthCheck ClusterHealthCheck `yaml:"healthCheck"`
+	Auth        ClusterAuth        `yaml:"auth"`
+	TLS         ClusterTLS         `yaml:"tls"`
+	Metadata    map[string]string  `yaml:"metadata"`
+}
+
+type ClusterHealthCheck struct {
+	Enabled            bool          `yaml:"enabled"`
+	Interval           time.Duration `yaml:"interval"`
+	Timeout            time.Duration `yaml:"timeout"`
+	HealthyThreshold   int           `yaml:"healthyThreshold"`
+	UnhealthyThreshold int           `yaml:"unhealthyThreshold"`
+	Path               string        `yaml:"path"`
+}
+
+type ClusterAuth struct {
+	Type     string `yaml:"type"`
+	Token    string `yaml:"token"`
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
+type ClusterTLS struct {
+	Enabled  bool   `yaml:"enabled"`
+	CertFile string `yaml:"certFile"`
+	KeyFile  string `yaml:"keyFile"`
+	CAFile   string `yaml:"caFile"`
+	Insecure bool   `yaml:"insecure"`
+}
+
+type OpenAPIConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	Title        string `yaml:"title"`
+	Version      string `yaml:"version"`
+	Description  string `yaml:"description"`
+	AutoGenerate bool   `yaml:"autoGenerate"`
+	OutputPath   string `yaml:"outputPath"`
+	UIEnabled    bool   `yaml:"uiEnabled"`
+	UIPath       string `yaml:"uiPath"`
 }
 
 type ServiceConfig struct {

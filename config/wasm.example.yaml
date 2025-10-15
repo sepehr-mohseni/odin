@@ -1,0 +1,279 @@
+# WebAssembly (WASM) Plugin Configuration Examples
+
+# Example 1: Basic WASM Configuration
+wasm:
+  enabled: true
+  pluginDir: /etc/odin/plugins
+  maxMemoryPages: 100  # 100 * 64KB = 6.4MB per plugin
+  maxInstances: 10
+  cacheEnabled: true
+  
+  plugins:
+    # Authentication plugin
+    - name: custom-auth
+      path: auth-plugin.wasm
+      type: auth
+      enabled: true
+      priority: 1  # Runs first
+      timeout: 5s
+      allowedUrls:
+        - /api/.*
+      config:
+        requireToken: true
+        tokenHeader: X-API-Token
+        
+    # Request transformation plugin
+    - name: request-transformer
+      path: transform-request.wasm
+      type: request
+      enabled: true
+      priority: 2
+      timeout: 3s
+      services:
+        - users-service
+        - products-service
+      config:
+        addHeaders:
+          X-Gateway: Odin
+        removeHeaders:
+          - X-Internal
+          
+    # Response aggregation plugin
+    - name: response-aggregator
+      path: aggregate.wasm
+      type: aggregation
+      enabled: true
+      priority: 10
+      timeout: 5s
+      config:
+        mergeStrategy: combine
+
+---
+
+# Example 2: Advanced Rate Limiting Plugin
+wasm:
+  enabled: true
+  pluginDir: /opt/odin/wasm-plugins
+  
+  plugins:
+    - name: advanced-ratelimit
+      path: ratelimit.wasm
+      type: ratelimit
+      enabled: true
+      priority: 1
+      timeout: 1s
+      allowedUrls:
+        - /api/.*
+      config:
+        globalLimit: 1000  # 1000 req/min globally
+        perUserLimit: 100  # 100 req/min per user
+        burstSize: 50
+        keyExtractor: header.X-User-ID
+
+---
+
+# Example 3: Custom Middleware Plugin
+wasm:
+  enabled: true
+  pluginDir: ./plugins
+  cacheEnabled: true
+  
+  plugins:
+    - name: security-headers
+      path: security.wasm
+      type: middleware
+      enabled: true
+      priority: 1
+      timeout: 500ms
+      config:
+        headers:
+          X-Frame-Options: DENY
+          X-Content-Type-Options: nosniff
+          X-XSS-Protection: 1; mode=block
+          Strict-Transport-Security: max-age=31536000; includeSubDomains
+          
+    - name: request-logger
+      path: logger.wasm
+      type: middleware
+      enabled: true
+      priority: 100  # Runs last
+      timeout: 1s
+      config:
+        logLevel: info
+        includeBody: false
+        includeHeaders: true
+
+---
+
+# Example 4: Service-Specific Plugins
+wasm:
+  enabled: true
+  pluginDir: /var/lib/odin/plugins
+  maxInstances: 20
+  
+  plugins:
+    # Plugin only for users service
+    - name: user-validator
+      path: validate-user.wasm
+      type: request
+      enabled: true
+      priority: 5
+      timeout: 2s
+      services:
+        - users-service
+      config:
+        validateEmail: true
+        validatePhone: true
+        
+    # Plugin only for payment service
+    - name: payment-encryptor
+      path: encrypt-payment.wasm
+      type: request
+      enabled: true
+      priority: 3
+      timeout: 3s
+      services:
+        - payment-service
+      config:
+        algorithm: AES-256-GCM
+        keyProvider: vault
+        
+    # Response cache plugin
+    - name: response-cache
+      path: cache.wasm
+      type: response
+      enabled: true
+      priority: 10
+      timeout: 1s
+      allowedUrls:
+        - /api/products.*
+        - /api/categories.*
+      config:
+        ttl: 300  # 5 minutes
+        keyStrategy: url
+
+---
+
+# Example 5: Complete Production Setup
+server:
+  host: 0.0.0.0
+  port: 8080
+
+wasm:
+  enabled: true
+  pluginDir: /etc/odin/wasm-plugins
+  maxMemoryPages: 200  # 12.8MB per plugin
+  maxInstances: 50
+  cacheEnabled: true
+  
+  plugins:
+    # 1. Authentication (highest priority)
+    - name: jwt-validator
+      path: jwt-auth.wasm
+      type: auth
+      enabled: true
+      priority: 1
+      timeout: 2s
+      allowedUrls:
+        - /api/.*
+      config:
+        publicKeyPath: /etc/odin/keys/public.pem
+        audience: api.example.com
+        issuer: auth.example.com
+        
+    # 2. Rate limiting
+    - name: smart-ratelimit
+      path: ratelimit-advanced.wasm
+      type: ratelimit
+      enabled: true
+      priority: 2
+      timeout: 500ms
+      config:
+        redis:
+          host: redis:6379
+          db: 0
+        limits:
+          default: 100
+          premium: 1000
+          admin: unlimited
+        window: 60s
+        
+    # 3. Request validation
+    - name: schema-validator
+      path: validate-schema.wasm
+      type: request
+      enabled: true
+      priority: 3
+      timeout: 2s
+      services:
+        - users-service
+        - orders-service
+      config:
+        schemaPath: /etc/odin/schemas
+        strict: true
+        
+    # 4. Request transformation
+    - name: api-gateway-transform
+      path: transform.wasm
+      type: request
+      enabled: true
+      priority: 4
+      timeout: 1s
+      config:
+        addTimestamp: true
+        addRequestId: true
+        normalizeHeaders: true
+        
+    # 5. Response transformation
+    - name: response-formatter
+      path: format-response.wasm
+      type: response
+      enabled: true
+      priority: 8
+      timeout: 1s
+      config:
+        format: json
+        includeMetadata: true
+        wrapResponse: true
+        
+    # 6. Response cache
+    - name: intelligent-cache
+      path: cache-response.wasm
+      type: response
+      enabled: true
+      priority: 9
+      timeout: 500ms
+      allowedUrls:
+        - /api/public/.*
+      config:
+        backend: redis
+        ttl: 300
+        varyBy:
+          - Accept-Language
+          - User-Agent
+        
+    # 7. Logging (lowest priority)
+    - name: audit-logger
+      path: audit-log.wasm
+      type: middleware
+      enabled: true
+      priority: 100
+      timeout: 1s
+      config:
+        destination: elasticsearch
+        includeBody: true
+        sensitiveFields:
+          - password
+          - creditCard
+          - ssn
+
+services:
+  - name: users-service
+    basePath: /api/users
+    targets:
+      - http://users-service:8080
+      
+  - name: orders-service
+    basePath: /api/orders
+    targets:
+      - http://orders-service:8080

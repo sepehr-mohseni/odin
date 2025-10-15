@@ -1,0 +1,366 @@
+# Multi-Cluster Deployment Configuration Examples
+
+# Example 1: Basic Multi-Cluster Setup
+multiCluster:
+  enabled: true
+  localCluster: us-east-1
+  failoverStrategy: priority  # priority, round-robin, least-load
+  loadBalancing: round-robin   # round-robin, weighted, latency
+  syncInterval: 1m
+  affinityEnabled: true
+  affinityTTL: 1h
+  
+  clusters:
+    # Primary cluster (local)
+    - name: us-east-1
+      endpoint: http://localhost:8080
+      region: us-east
+      zone: us-east-1a
+      priority: 1
+      weight: 100
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 30s
+        timeout: 5s
+        healthyThreshold: 2
+        unhealthyThreshold: 3
+        path: /health
+      auth:
+        type: none
+      tls:
+        enabled: false
+        
+    # Secondary cluster
+    - name: us-west-1
+      endpoint: https://gateway.us-west-1.example.com
+      region: us-west
+      zone: us-west-1a
+      priority: 2
+      weight: 100
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 30s
+        timeout: 5s
+        path: /health
+      auth:
+        type: token
+        token: ${CLUSTER_AUTH_TOKEN}
+      tls:
+        enabled: true
+        caFile: /etc/odin/certs/ca.pem
+
+---
+
+# Example 2: Production Multi-Region Setup
+multiCluster:
+  enabled: true
+  localCluster: production-us-east
+  failoverStrategy: priority
+  loadBalancing: latency  # Route to lowest latency cluster
+  syncInterval: 30s
+  affinityEnabled: true
+  affinityTTL: 2h
+  
+  clusters:
+    # US East (Primary)
+    - name: production-us-east
+      endpoint: https://api-gateway-east.prod.example.com
+      region: us-east
+      zone: us-east-1a
+      priority: 1
+      weight: 50
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 15s
+        timeout: 3s
+        healthyThreshold: 2
+        unhealthyThreshold: 3
+        path: /api/health
+      auth:
+        type: mtls
+      tls:
+        enabled: true
+        certFile: /etc/odin/tls/client-cert.pem
+        keyFile: /etc/odin/tls/client-key.pem
+        caFile: /etc/odin/tls/ca.pem
+        insecure: false
+      metadata:
+        datacenter: dc1
+        version: v1.0.0
+        
+    # US West (Secondary)
+    - name: production-us-west
+      endpoint: https://api-gateway-west.prod.example.com
+      region: us-west
+      zone: us-west-2a
+      priority: 2
+      weight: 50
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 15s
+        timeout: 3s
+        path: /api/health
+      auth:
+        type: mtls
+      tls:
+        enabled: true
+        certFile: /etc/odin/tls/client-cert.pem
+        keyFile: /etc/odin/tls/client-key.pem
+        caFile: /etc/odin/tls/ca.pem
+      metadata:
+        datacenter: dc2
+        version: v1.0.0
+        
+    # EU (Compliance region)
+    - name: production-eu-west
+      endpoint: https://api-gateway-eu.prod.example.com
+      region: eu-west
+      zone: eu-west-1a
+      priority: 3
+      weight: 30
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 20s
+        timeout: 5s
+        path: /api/health
+      auth:
+        type: mtls
+      tls:
+        enabled: true
+        certFile: /etc/odin/tls/client-cert.pem
+        keyFile: /etc/odin/tls/client-key.pem
+        caFile: /etc/odin/tls/ca.pem
+      metadata:
+        datacenter: dc3
+        compliance: gdpr
+        version: v1.0.0
+        
+    # Asia Pacific
+    - name: production-ap-south
+      endpoint: https://api-gateway-ap.prod.example.com
+      region: ap-south
+      zone: ap-south-1a
+      priority: 4
+      weight: 20
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 20s
+        timeout: 5s
+        path: /api/health
+      auth:
+        type: mtls
+      tls:
+        enabled: true
+        certFile: /etc/odin/tls/client-cert.pem
+        keyFile: /etc/odin/tls/client-key.pem
+        caFile: /etc/odin/tls/ca.pem
+      metadata:
+        datacenter: dc4
+        version: v1.0.0
+
+---
+
+# Example 3: Weighted Load Balancing
+multiCluster:
+  enabled: true
+  localCluster: main-cluster
+  failoverStrategy: round-robin
+  loadBalancing: weighted
+  syncInterval: 1m
+  
+  clusters:
+    # Large capacity cluster
+    - name: main-cluster
+      endpoint: http://main-gateway.local:8080
+      region: local
+      priority: 1
+      weight: 70  # Handle 70% of traffic
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 10s
+        timeout: 2s
+        
+    # Medium capacity cluster
+    - name: backup-cluster
+      endpoint: http://backup-gateway.local:8080
+      region: local
+      priority: 2
+      weight: 20  # Handle 20% of traffic
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 10s
+        timeout: 2s
+        
+    # Disaster recovery cluster
+    - name: dr-cluster
+      endpoint: http://dr-gateway.remote:8080
+      region: remote
+      priority: 3
+      weight: 10  # Handle 10% of traffic
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 30s
+        timeout: 5s
+
+---
+
+# Example 4: Development/Testing Multi-Cluster
+multiCluster:
+  enabled: true
+  localCluster: dev-local
+  failoverStrategy: round-robin
+  loadBalancing: round-robin
+  syncInterval: 5m
+  affinityEnabled: false
+  
+  clusters:
+    - name: dev-local
+      endpoint: http://localhost:8080
+      region: local
+      priority: 1
+      weight: 100
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 1m
+        timeout: 10s
+      auth:
+        type: none
+      tls:
+        enabled: false
+        
+    - name: staging
+      endpoint: http://staging-gateway:8080
+      region: staging
+      priority: 2
+      weight: 100
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 1m
+        timeout: 10s
+      auth:
+        type: basic
+        username: admin
+        password: ${STAGING_PASSWORD}
+      tls:
+        enabled: false
+
+---
+
+# Example 5: High-Availability Configuration
+server:
+  port: 8080
+  timeout: 30s
+
+multiCluster:
+  enabled: true
+  localCluster: ha-primary
+  failoverStrategy: priority
+  loadBalancing: latency
+  syncInterval: 10s  # Fast sync for HA
+  affinityEnabled: true
+  affinityTTL: 30m
+  
+  clusters:
+    # Primary HA node
+    - name: ha-primary
+      endpoint: https://ha1.gateway.internal:8443
+      region: region-a
+      zone: zone-1
+      priority: 1
+      weight: 50
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 5s  # Aggressive health checking
+        timeout: 1s
+        healthyThreshold: 2
+        unhealthyThreshold: 2  # Fast failure detection
+        path: /healthz
+      auth:
+        type: token
+        token: ${HA_TOKEN}
+      tls:
+        enabled: true
+        certFile: /etc/odin/ha/cert.pem
+        keyFile: /etc/odin/ha/key.pem
+        caFile: /etc/odin/ha/ca.pem
+      metadata:
+        role: primary
+        
+    # Secondary HA node
+    - name: ha-secondary
+      endpoint: https://ha2.gateway.internal:8443
+      region: region-a
+      zone: zone-2
+      priority: 1  # Same priority for active-active
+      weight: 50
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 5s
+        timeout: 1s
+        healthyThreshold: 2
+        unhealthyThreshold: 2
+        path: /healthz
+      auth:
+        type: token
+        token: ${HA_TOKEN}
+      tls:
+        enabled: true
+        certFile: /etc/odin/ha/cert.pem
+        keyFile: /etc/odin/ha/key.pem
+        caFile: /etc/odin/ha/ca.pem
+      metadata:
+        role: secondary
+        
+    # Failover node in different region
+    - name: ha-failover
+      endpoint: https://ha3.gateway.remote:8443
+      region: region-b
+      zone: zone-1
+      priority: 2  # Lower priority = used only on failure
+      weight: 100
+      enabled: true
+      healthCheck:
+        enabled: true
+        interval: 10s
+        timeout: 2s
+        healthyThreshold: 3
+        unhealthyThreshold: 3
+        path: /healthz
+      auth:
+        type: token
+        token: ${HA_TOKEN}
+      tls:
+        enabled: true
+        certFile: /etc/odin/ha/cert.pem
+        keyFile: /etc/odin/ha/key.pem
+        caFile: /etc/odin/ha/ca.pem
+      metadata:
+        role: failover
+
+# Service definitions
+services:
+  - name: users-service
+    basePath: /api/users
+    # Service can be deployed in multiple clusters
+    targets:
+      - http://users-service:8080
+    timeout: 10s
+    
+  - name: orders-service
+    basePath: /api/orders
+    targets:
+      - http://orders-service:8080
+    timeout: 15s
