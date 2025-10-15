@@ -4,17 +4,16 @@ This document outlines the planned future development for the Odin API Gateway p
 
 ## Long-term Goals (6-12 months)
 
-- [ ] Develop service mesh integration
 - [ ] Add AI-powered traffic analysis and anomaly detection using dockerized grok 1 open release "https://github.com/xai-org/grok-1"
 - [ ] Support for WebAssembly extensions
 - [ ] Multi-cluster deployment and management
 - [ ] Automated API documentation generation
 - [ ] Ability to add service information based on openapi json file collection import
 - [ ] Ability to add Go plugin and register as middleware from admin panel
-- [ ] Integration with popular API management platforms like Postman API Platform and Amazon API Gateway and Apigee API Management
-- [ ] Add MongoDB for storing all the information for config, services, monitoring and other stuff
+- [ ] Integration with popular API management platforms like Postman API Platform and Amazon API Gateway
+- [ ] Add MongoDB for storing all the information for config, services, monitoring and other stuff and move every movable stuff into mongodb. store other gateway specific configs inside one unified yaml file
 - [ ] Refactor to a better structured html templates with good coding
-- [ ] Add all the abilities to frontend admin panel to manage all o the gateway setting and monitoring from the admin panel (based on already implemented goals and features)
+- [ ] Add all the abilities to frontend admin panel to manage all o the gateway setting and monitoring from the admin panel (based on already implemented goals and features and help of files in docs folder)
 - [ ] Upgrade to latest Go version and packages
 
 ## Recently Completed Goals
@@ -48,3 +47,4 @@ This document outlines the planned future development for the Odin API Gateway p
 - [x] Add request transformation templates
 - [x] Enhance tracing with trace visualization UI
 - [x] Add service health monitoring and alerting
+- [x] Develop service mesh integration (Supports Istio, Linkerd, Consul Connect with mTLS, service discovery, and automatic header injection)

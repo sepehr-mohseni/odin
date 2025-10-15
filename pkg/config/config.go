@@ -11,16 +11,17 @@ import (
 )
 
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
-	Logging    LoggingConfig    `yaml:"logging"`
-	Auth       AuthConfig       `yaml:"auth"`
-	RateLimit  RateLimitConfig  `yaml:"rateLimit"`
-	Cache      CacheConfig      `yaml:"cache"`
-	Monitoring MonitoringConfig `yaml:"monitoring"`
-	Admin      AdminConfig      `yaml:"admin"`
-	Plugins    PluginsConfig    `yaml:"plugins"`
-	Tracing    TracingConfig    `yaml:"tracing"`
-	Services   []ServiceConfig  `yaml:"services"`
+	Server      ServerConfig      `yaml:"server"`
+	Logging     LoggingConfig     `yaml:"logging"`
+	Auth        AuthConfig        `yaml:"auth"`
+	RateLimit   RateLimitConfig   `yaml:"rateLimit"`
+	Cache       CacheConfig       `yaml:"cache"`
+	Monitoring  MonitoringConfig  `yaml:"monitoring"`
+	Admin       AdminConfig       `yaml:"admin"`
+	Plugins     PluginsConfig     `yaml:"plugins"`
+	Tracing     TracingConfig     `yaml:"tracing"`
+	Services    []ServiceConfig   `yaml:"services"`
+	ServiceMesh ServiceMeshConfig `yaml:"serviceMesh"`
 }
 
 type ServerConfig struct {
@@ -94,6 +95,45 @@ type TracingConfig struct {
 	Endpoint       string  `yaml:"endpoint"`
 	SampleRate     float64 `yaml:"sampleRate"`
 	Insecure       bool    `yaml:"insecure"`
+}
+
+type ServiceMeshConfig struct {
+	Enabled         bool               `yaml:"enabled"`
+	Type            string             `yaml:"type"` // istio, linkerd, consul, none
+	Namespace       string             `yaml:"namespace"`
+	TrustDomain     string             `yaml:"trustDomain"`
+	DiscoveryAddr   string             `yaml:"discoveryAddr"`
+	RefreshInterval time.Duration      `yaml:"refreshInterval"`
+	MTLSEnabled     bool               `yaml:"mtlsEnabled"`
+	CertFile        string             `yaml:"certFile"`
+	KeyFile         string             `yaml:"keyFile"`
+	CAFile          string             `yaml:"caFile"`
+	Istio           *IstioMeshConfig   `yaml:"istio,omitempty"`
+	Linkerd         *LinkerdMeshConfig `yaml:"linkerd,omitempty"`
+	Consul          *ConsulMeshConfig  `yaml:"consul,omitempty"`
+}
+
+type IstioMeshConfig struct {
+	PilotAddr         string   `yaml:"pilotAddr"`
+	MixerAddr         string   `yaml:"mixerAddr"`
+	EnableTelemetry   bool     `yaml:"enableTelemetry"`
+	EnablePolicyCheck bool     `yaml:"enablePolicyCheck"`
+	CustomHeaders     []string `yaml:"customHeaders"`
+	InjectSidecar     bool     `yaml:"injectSidecar"`
+}
+
+type LinkerdMeshConfig struct {
+	ControlPlaneAddr string `yaml:"controlPlaneAddr"`
+	TapAddr          string `yaml:"tapAddr"`
+	EnableTap        bool   `yaml:"enableTap"`
+	ProfileNamespace string `yaml:"profileNamespace"`
+}
+
+type ConsulMeshConfig struct {
+	HTTPAddr      string `yaml:"httpAddr"`
+	Datacenter    string `yaml:"datacenter"`
+	Token         string `yaml:"token"`
+	EnableConnect bool   `yaml:"enableConnect"`
 }
 
 type ServiceConfig struct {

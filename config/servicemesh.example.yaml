@@ -1,0 +1,138 @@
+# Service Mesh Integration Configuration Examples
+
+# Example 1: Istio Service Mesh Integration
+serviceMesh:
+  enabled: true
+  type: istio
+  namespace: default
+  trustDomain: cluster.local
+  refreshInterval: 30s
+  
+  # mTLS Configuration
+  mtlsEnabled: true
+  certFile: /etc/certs/cert-chain.pem
+  keyFile: /etc/certs/key.pem
+  caFile: /etc/certs/root-cert.pem
+  
+  # Istio-specific configuration
+  istio:
+    pilotAddr: istiod.istio-system.svc.cluster.local:15012
+    mixerAddr: istio-telemetry.istio-system.svc.cluster.local:15004
+    enableTelemetry: true
+    enablePolicyCheck: true
+    customHeaders:
+      - X-Custom-Header
+      - X-Organization
+    injectSidecar: true
+
+---
+
+# Example 2: Linkerd Service Mesh Integration
+serviceMesh:
+  enabled: true
+  type: linkerd
+  namespace: default
+  refreshInterval: 30s
+  
+  # mTLS Configuration  
+  mtlsEnabled: true
+  certFile: /var/run/linkerd/tls/cert.pem
+  keyFile: /var/run/linkerd/tls/key.pem
+  caFile: /var/run/linkerd/tls/ca.pem
+  
+  # Linkerd-specific configuration
+  linkerd:
+    controlPlaneAddr: linkerd-controller-api.linkerd.svc.cluster.local:8085
+    tapAddr: linkerd-tap.linkerd.svc.cluster.local:8088
+    enableTap: true
+    profileNamespace: linkerd
+
+---
+
+# Example 3: Consul Connect Service Mesh Integration
+serviceMesh:
+  enabled: true
+  type: consul
+  namespace: default
+  refreshInterval: 30s
+  
+  # mTLS Configuration
+  mtlsEnabled: true
+  certFile: /etc/consul/tls/cert.pem
+  keyFile: /etc/consul/tls/key.pem
+  caFile: /etc/consul/tls/ca.pem
+  
+  # Consul-specific configuration
+  consul:
+    httpAddr: http://consul-server.consul.svc.cluster.local:8500
+    datacenter: dc1
+    token: ${CONSUL_HTTP_TOKEN}
+    enableConnect: true
+
+---
+
+# Example 4: No Service Mesh (Default)
+serviceMesh:
+  enabled: false
+  type: none
+
+---
+
+# Complete Configuration with Service Mesh
+server:
+  port: 8080
+  timeout: 30s
+
+logging:
+  level: info
+  json: false
+
+# Service Mesh Configuration
+serviceMesh:
+  enabled: true
+  type: istio
+  namespace: production
+  trustDomain: my-cluster.local
+  refreshInterval: 30s
+  mtlsEnabled: true
+  certFile: /etc/certs/cert.pem
+  keyFile: /etc/certs/key.pem
+  caFile: /etc/certs/ca.pem
+  
+  istio:
+    pilotAddr: istiod.istio-system.svc:15012
+    enableTelemetry: true
+    enablePolicyCheck: false
+    injectSidecar: true
+
+# Services remain the same
+services:
+  - name: users-service
+    basePath: /api/users
+    targets:
+      - http://users-service.production.svc.cluster.local:8080
+    authentication: true
+    loadBalancing: round-robin
+    
+    healthCheck:
+      enabled: true
+      interval: 30s
+      timeout: 5s
+
+  - name: products-service
+    basePath: /api/products
+    targets:
+      - http://products-service.production.svc.cluster.local:8080
+    authentication: false
+    loadBalancing: round-robin
+
+# Distributed Tracing (works with service mesh)
+tracing:
+  enabled: true
+  serviceName: odin-gateway
+  endpoint: http://jaeger-collector.istio-system.svc:14268/api/traces
+  sampleRate: 1.0
+
+monitoring:
+  enabled: true
+  path: /metrics

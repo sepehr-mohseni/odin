@@ -20,6 +20,7 @@ import (
 	"odin/pkg/plugins"
 	"odin/pkg/routing"
 	"odin/pkg/service"
+	"odin/pkg/servicemesh"
 	"odin/pkg/tracing"
 
 	"github.com/labstack/echo/v4"
@@ -39,6 +40,7 @@ type Gateway struct {
 	tracingManager  *tracing.Manager
 	healthChecker   *health.TargetChecker
 	alertManager    *health.AlertManager
+	meshManager     *servicemesh.Manager
 }
 
 func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway, error) {
@@ -197,6 +199,55 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 	}
 	healthChecker := health.NewTargetChecker(healthCheckerConfig, logger, alertManager)
 
+	// Initialize service mesh integration
+	meshConfig := servicemesh.Config{
+		Enabled:         cfg.ServiceMesh.Enabled,
+		Type:            servicemesh.MeshType(cfg.ServiceMesh.Type),
+		Namespace:       cfg.ServiceMesh.Namespace,
+		TrustDomain:     cfg.ServiceMesh.TrustDomain,
+		DiscoveryAddr:   cfg.ServiceMesh.DiscoveryAddr,
+		RefreshInterval: cfg.ServiceMesh.RefreshInterval,
+		MTLSEnabled:     cfg.ServiceMesh.MTLSEnabled,
+		CertFile:        cfg.ServiceMesh.CertFile,
+		KeyFile:         cfg.ServiceMesh.KeyFile,
+		CAFile:          cfg.ServiceMesh.CAFile,
+	}
+
+	// Convert mesh-specific configs
+	if cfg.ServiceMesh.Istio != nil {
+		meshConfig.Istio = &servicemesh.IstioConfig{
+			PilotAddr:         cfg.ServiceMesh.Istio.PilotAddr,
+			MixerAddr:         cfg.ServiceMesh.Istio.MixerAddr,
+			EnableTelemetry:   cfg.ServiceMesh.Istio.EnableTelemetry,
+			EnablePolicyCheck: cfg.ServiceMesh.Istio.EnablePolicyCheck,
+			CustomHeaders:     cfg.ServiceMesh.Istio.CustomHeaders,
+			InjectSidecar:     cfg.ServiceMesh.Istio.InjectSidecar,
+		}
+	}
+
+	if cfg.ServiceMesh.Linkerd != nil {
+		meshConfig.Linkerd = &servicemesh.LinkerdConfig{
+			ControlPlaneAddr: cfg.ServiceMesh.Linkerd.ControlPlaneAddr,
+			TapAddr:          cfg.ServiceMesh.Linkerd.TapAddr,
+			EnableTap:        cfg.ServiceMesh.Linkerd.EnableTap,
+			ProfileNamespace: cfg.ServiceMesh.Linkerd.ProfileNamespace,
+		}
+	}
+
+	if cfg.ServiceMesh.Consul != nil {
+		meshConfig.Consul = &servicemesh.ConsulConfig{
+			HTTPAddr:      cfg.ServiceMesh.Consul.HTTPAddr,
+			Datacenter:    cfg.ServiceMesh.Consul.Datacenter,
+			Token:         cfg.ServiceMesh.Consul.Token,
+			EnableConnect: cfg.ServiceMesh.Consul.EnableConnect,
+		}
+	}
+
+	meshManager, err := servicemesh.NewManager(meshConfig, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize service mesh: %w", err)
+	}
+
 	gateway := &Gateway{
 		server:          e,
 		config:          cfg,
@@ -208,6 +259,7 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 		tracingManager:  tracingManager,
 		healthChecker:   healthChecker,
 		alertManager:    alertManager,
+		meshManager:     meshManager,
 	}
 
 	// Setup protocol-specific proxies
@@ -253,6 +305,19 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 	logging.ConfigureLoggerLegacy(logger, cfg.Logging.Level, cfg.Logging.JSON)
 
 	health.Register(e, logger)
+
+	// Start service mesh integration
+	if cfg.ServiceMesh.Enabled {
+		ctx := context.Background()
+		if err := meshManager.Start(ctx); err != nil {
+			logger.WithError(err).Warn("Failed to start service mesh integration, continuing without it")
+		} else {
+			// Add service mesh middleware
+			e.Use(servicemesh.Middleware(meshManager, logger))
+			e.Use(servicemesh.ProxyMiddleware(meshManager, logger))
+			logger.WithField("type", cfg.ServiceMesh.Type).Info("Service mesh integration started")
+		}
+	}
 
 	// Add all service targets to health checker
 	for _, svcConfig := range cfg.Services {
@@ -371,6 +436,14 @@ func (g *Gateway) Shutdown(ctx context.Context) error {
 		g.alertManager.Stop()
 	}
 	g.logger.Info("Health monitoring stopped")
+
+	// Stop service mesh integration
+	if g.meshManager != nil {
+		g.logger.Info("Stopping service mesh integration...")
+		if err := g.meshManager.Stop(); err != nil {
+			g.logger.WithError(err).Warn("Error stopping service mesh")
+		}
+	}
 
 	return g.server.Shutdown(ctx)
 }
