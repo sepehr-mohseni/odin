@@ -25,6 +25,9 @@ func (h *AdminHandler) Register(e *echo.Echo) {
 	protected.GET("/api/monitoring/metrics", GetMetricsAPI)
 	protected.GET("/ws/monitoring", WebSocketMonitoring)
 
+	// Traces routes
+	protected.GET("/traces", h.handleTraces)
+
 	// Debug endpoint for testing (remove in production)
 	adminGroup.GET("/debug/metrics", GetMetricsAPI)
 
@@ -44,4 +47,8 @@ func (h *AdminHandler) handleDashboard(c echo.Context) error {
 
 func (h *AdminHandler) handleMonitoring(c echo.Context) error {
 	return h.renderTemplate(c, "monitoring.html", nil)
+}
+
+func (h *AdminHandler) handleTraces(c echo.Context) error {
+	return h.renderTemplate(c, "traces.html", nil)
 }

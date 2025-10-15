@@ -81,8 +81,9 @@ type CacheConfig struct {
 }
 
 type MonitoringConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Path    string `yaml:"path"`
+	Enabled    bool   `yaml:"enabled"`
+	Path       string `yaml:"path"`
+	WebhookURL string `yaml:"webhookUrl,omitempty"` // Optional webhook for health alerts
 }
 
 type TracingConfig struct {
@@ -111,6 +112,7 @@ type ServiceConfig struct {
 	Aggregation    *AggregationConfig `yaml:"aggregation,omitempty"`
 	GraphQL        *GraphQLConfig     `yaml:"graphql,omitempty"`
 	GRPC           *GRPCConfig        `yaml:"grpc,omitempty"`
+	HealthCheck    *HealthCheckConfig `yaml:"healthCheck,omitempty"`
 }
 
 type TransformConfig struct {
@@ -156,6 +158,17 @@ type DependencyConfig struct {
 type MappingConfig struct {
 	From string `yaml:"from"`
 	To   string `yaml:"to"`
+}
+
+// HealthCheckConfig holds health check configuration for backend targets
+type HealthCheckConfig struct {
+	Enabled            bool          `yaml:"enabled"`
+	Interval           time.Duration `yaml:"interval"`           // How often to check (default: 30s)
+	Timeout            time.Duration `yaml:"timeout"`            // Request timeout (default: 5s)
+	UnhealthyThreshold int           `yaml:"unhealthyThreshold"` // Failures before unhealthy (default: 3)
+	HealthyThreshold   int           `yaml:"healthyThreshold"`   // Successes before healthy (default: 2)
+	ExpectedStatus     []int         `yaml:"expectedStatus"`     // Expected HTTP status codes (default: [200, 204])
+	InsecureSkipVerify bool          `yaml:"insecureSkipVerify"` // Skip TLS verification
 }
 
 // SetDefaults sets default values for ServiceConfig

@@ -21,6 +21,31 @@ services:
         - from: $.data
           to: $.result
           default: ''
+    # Example: Template-based transformations (new feature)
+    transformation:
+      request:
+        headers:
+          X-User-Agent: "Odin-Gateway/1.0"
+          X-Request-ID: "{{ .X-Request-ID }}"
+        queryParams:
+          page: "{{ default \"1\" .page }}"
+          limit: "{{ default \"20\" .limit }}"
+        body: |
+          {
+            "user": {
+              "name": "{{ .name }}",
+              "email": "{{ lower .email }}"
+            }
+          }
+      response:
+        headers:
+          X-Powered-By: "Odin API Gateway"
+        body: |
+          {
+            "success": true,
+            "data": {{ toJson . }},
+            "timestamp": "2024-01-01T00:00:00Z"
+          }
 
   - name: products
     basePath: /api/products
@@ -46,6 +71,18 @@ services:
           resultMapping:
             - from: $
               to: $.category
+    # Example: Canary deployment with 10% traffic to new version
+    canary:
+      enabled: true
+      targets:
+        - http://localhost:8086  # Canary version
+      weight: 10                  # 10% of traffic
+      # Optional: Route specific users to canary
+      # header: X-Beta-User
+      # headerValue: "true"
+      # Optional: Cookie-based routing
+      # cookieName: beta_user
+      # cookieValue: "1"
 
   - name: orders
     basePath: /api/orders

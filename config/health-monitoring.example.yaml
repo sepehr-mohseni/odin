@@ -1,0 +1,85 @@
+# Health Monitoring Configuration Example
+# This file demonstrates how to configure health monitoring for backend services
+
+monitoring:
+  enabled: true
+  path: /metrics
+  webhookUrl: "https://your-webhook-endpoint.com/alerts" # Optional: Webhook for receiving health alerts
+
+services:
+  - name: users-service
+    basePath: /api/users
+    targets:
+      - http://localhost:3001
+      - http://localhost:3002
+    loadBalancing: round-robin
+    
+    # Health Check Configuration
+    healthCheck:
+      enabled: true                 # Enable health monitoring for this service
+      interval: 30s                 # Check every 30 seconds
+      timeout: 5s                   # Timeout for each health check request
+      unhealthyThreshold: 3         # Mark unhealthy after 3 consecutive failures
+      healthyThreshold: 2           # Mark healthy after 2 consecutive successes
+      expectedStatus: [200, 204]    # Expected HTTP status codes
+      insecureSkipVerify: false     # Set to true to skip TLS verification
+
+  - name: products-service
+    basePath: /api/products
+    targets:
+      - https://products-api.example.com
+    
+    # Custom health check settings for critical services
+    healthCheck:
+      enabled: true
+      interval: 15s                 # More frequent checks for critical services
+      timeout: 3s                   # Shorter timeout
+      unhealthyThreshold: 2         # Faster detection of issues
+      healthyThreshold: 3           # More conservative recovery
+      expectedStatus: [200]
+      insecureSkipVerify: false
+
+  - name: orders-service
+    basePath: /api/orders
+    targets:
+      - http://orders-1.internal:8080
+      - http://orders-2.internal:8080
+      - http://orders-3.internal:8080
+    
+    # Health monitoring with default settings
+    healthCheck:
+      enabled: true
+      # When not specified, uses defaults:
+      # interval: 30s
+      # timeout: 5s
+      # unhealthyThreshold: 3
+      # healthyThreshold: 2
+      # expectedStatus: [200, 204]
+
+  - name: legacy-service
+    basePath: /api/legacy
+    targets:
+      - https://legacy-api.example.com
+    
+    # Skip TLS verification for internal/dev services
+    healthCheck:
+      enabled: true
+      insecureSkipVerify: true  # Use with caution - only for dev/internal services
+
+# Health Check Behavior:
+# 
+# 1. Each target gets a health check request to <target>/health
+# 2. If the response status matches expectedStatus, it's counted as success
+# 3. After `unhealthyThreshold` consecutive failures, target is marked unhealthy
+# 4. After `healthyThreshold` consecutive successes, target is marked healthy
+# 
+# Alerts:
+# - When a target becomes unhealthy, an alert is sent (type: target_down, severity: critical)
+# - When an unhealthy target recovers, an alert is sent (type: target_recovered, severity: info)
+# - Alerts are sent to all configured channels (webhook, logs)
+# - Alerts are throttled to prevent spam (5-minute minimum between duplicate alerts)
+#
+# Monitoring:
+# - Health status is tracked for each target
+# - Metrics include: consecutive fails/passes, response times, success rates
+# - All health data is available via the gateway's internal monitoring

@@ -1,0 +1,204 @@
+# Complete Feature Showcase
+# This configuration demonstrates all the advanced features implemented:
+# - Canary Deployments
+# - Request/Response Transformations
+# - Health Monitoring & Alerting
+# - Distributed Tracing (already configured in main config)
+
+monitoring:
+  enabled: true
+  path: /metrics
+  webhookUrl: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+tracing:
+  enabled: true
+  serviceName: "odin-gateway"
+  endpoint: "http://localhost:4318"
+  sampleRate: 1.0
+
+services:
+  # Example 1: Complete feature integration
+  - name: users-api
+    basePath: /api/v1/users
+    targets:
+      - http://users-v1.internal:8080
+      - http://users-v1.internal:8081
+    loadBalancing: round-robin
+    
+    # Canary deployment for v2
+    canary:
+      enabled: true
+      targets:
+        - http://users-v2.internal:8080  # New version
+      weight: 20  # 20% of traffic to v2
+      header: "X-Beta-User"
+      headerValue: "true"
+      cookieName: "beta_tester"
+      cookieValue: "1"
+    
+    # Transform requests and responses
+    transformation:
+      request:
+        headers:
+          X-Gateway: "Odin-Gateway"
+          X-Request-ID: "{{ .X-Request-ID }}"
+        queryParams:
+          version: "v1"
+        body: |
+          {
+            "user": {
+              "email": "{{ lower .email }}",
+              "name": "{{ .name }}",
+              "role": "{{ default \"user\" .role }}"
+            },
+            "timestamp": "{{ now }}"
+          }
+      response:
+        headers:
+          X-Processed-By: "Odin Gateway"
+        body: |
+          {
+            "success": true,
+            "data": {{ toJson . }},
+            "version": "v1"
+          }
+    
+    # Active health monitoring
+    healthCheck:
+      enabled: true
+      interval: 30s
+      timeout: 5s
+      unhealthyThreshold: 3
+      healthyThreshold: 2
+      expectedStatus: [200, 204]
+    
+    authentication: true
+    timeout: 10s
+    retryCount: 3
+
+  # Example 2: Critical service with aggressive health checks
+  - name: payments-api
+    basePath: /api/v1/payments
+    targets:
+      - https://payments-primary.external:443
+      - https://payments-secondary.external:443
+    
+    # Fast health detection for critical service
+    healthCheck:
+      enabled: true
+      interval: 15s          # Check every 15 seconds
+      timeout: 3s            # Quick timeout
+      unhealthyThreshold: 2  # Fail fast
+      healthyThreshold: 3    # Recover conservatively
+      expectedStatus: [200]
+    
+    # Simple transformation to add security headers
+    transformation:
+      request:
+        headers:
+          X-Payment-Gateway: "Odin"
+          X-Client-Version: "1.0"
+    
+    authentication: true
+    timeout: 30s
+
+  # Example 3: Gradual canary rollout
+  - name: search-api
+    basePath: /api/v1/search
+    targets:
+      - http://search-v1:9200
+    
+    # Testing new Elasticsearch version
+    canary:
+      enabled: true
+      targets:
+        - http://search-v2:9200
+      weight: 5  # Only 5% to start
+    
+    # Transform search queries
+    transformation:
+      request:
+        body: |
+          {
+            "query": {
+              "match": {
+                "content": "{{ .query }}"
+              }
+            },
+            "size": {{ default "10" .size }},
+            "from": {{ default "0" .from }}
+          }
+      response:
+        body: |
+          {
+            "results": {{ toJson .hits.hits }},
+            "total": {{ .hits.total.value }},
+            "took": {{ .took }}
+          }
+    
+    healthCheck:
+      enabled: true
+      interval: 45s
+      expectedStatus: [200, 201]
+
+  # Example 4: Beta testing with header routing
+  - name: recommendations-api
+    basePath: /api/v1/recommendations
+    targets:
+      - http://recommendations-stable:8080
+    
+    # Route beta users to new ML model
+    canary:
+      enabled: true
+      targets:
+        - http://recommendations-ml-v2:8080
+      header: "X-Use-ML-V2"
+      headerValue: "true"
+      weight: 0  # Only via header, no random routing
+    
+    transformation:
+      request:
+        headers:
+          X-Model-Version: "{{ if .X-Use-ML-V2 }}v2{{ else }}v1{{ end }}"
+      response:
+        body: |
+          {
+            "recommendations": {{ toJson .items }},
+            "model_version": "{{ .model }}",
+            "confidence": {{ .confidence }}
+          }
+    
+    healthCheck:
+      enabled: true
+
+# How to use this configuration:
+# 
+# 1. Start the gateway:
+#    ./odin-gateway -config=docs/examples/complete-feature-showcase.yaml
+#
+# 2. Test canary routing:
+#    # Regular request (80% to v1, 20% to v2):
+#    curl http://localhost:8080/api/v1/users
+#    
+#    # Force canary with header:
+#    curl -H "X-Beta-User: true" http://localhost:8080/api/v1/users
+#    
+#    # Force canary with cookie:
+#    curl -b "beta_tester=1" http://localhost:8080/api/v1/users
+#
+# 3. Test transformations:
+#    # Send transformed request:
+#    curl -X POST http://localhost:8080/api/v1/users \
+#      -d '{"email":"USER@EXAMPLE.COM","name":"John Doe"}'
+#    # Email will be lowercased, default role added
+#
+# 4. Monitor health:
+#    # Check logs for health status:
+#    tail -f logs/gateway.log | grep health
+#    
+#    # Webhook alerts will be sent to configured Slack channel
+#
+# 5. View traces:
+#    # Open admin UI:
+#    http://localhost:8080/admin/traces
+#    # Search, filter, and inspect distributed traces

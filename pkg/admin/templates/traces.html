@@ -1,0 +1,482 @@
+{{define "traces.html"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Traces - Odin Gateway</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .trace-card {
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .trace-card:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        .trace-status {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .trace-status.success {
+            background-color: #d1f4d1;
+            color: #0d6f0d;
+        }
+        .trace-status.error {
+            background-color: #f8d7da;
+            color: #842029;
+        }
+        .trace-status.warning {
+            background-color: #fff3cd;
+            color: #997404;
+        }
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+        .timeline-item {
+            position: relative;
+            padding: 10px 0;
+            border-left: 2px solid #dee2e6;
+        }
+        .timeline-marker {
+            position: absolute;
+            left: -6px;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background-color: #0d6efd;
+        }
+        .span-bar {
+            height: 24px;
+            border-radius: 4px;
+            display: inline-block;
+            position: relative;
+            margin: 2px 0;
+        }
+        .span-success {
+            background-color: #28a745;
+        }
+        .span-error {
+            background-color: #dc3545;
+        }
+        .filter-badge {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .filter-badge:hover {
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="container-fluid">
+        <div class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom">
+            <a href="/admin/dashboard" class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none">
+                <span class="fs-4">🔍 Odin Gateway</span>
+            </a>
+            <ul class="nav nav-pills">
+                <li class="nav-item">
+                    <a href="/admin/dashboard" class="nav-link">Dashboard</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/admin/monitoring" class="nav-link">Monitoring</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/admin/traces" class="nav-link active">Traces</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/admin/services/new" class="nav-link">Add Service</a>
+                </li>
+                <li class="nav-item">
+                    <a href="/admin/login" class="nav-link">Logout</a>
+                </li>
+            </ul>
+        </div>
+    </header>
+    
+    <div class="container-fluid mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h2><i class="bi bi-diagram-3"></i> Distributed Traces</h2>
+                <p class="text-muted">View and analyze request traces across services</p>
+            </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-3">
+                                <input type="text" class="form-control" id="searchInput" placeholder="Search by Trace ID, Path, Service...">
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" id="statusFilter">
+                                    <option value="">All Status</option>
+                                    <option value="success">Success (2xx)</option>
+                                    <option value="error">Error (4xx, 5xx)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" id="methodFilter">
+                                    <option value="">All Methods</option>
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                    <option value="PATCH">PATCH</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <select class="form-select" id="serviceFilter">
+                                    <option value="">All Services</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <button class="btn btn-outline-secondary" id="clearFilters">
+                                    <i class="bi bi-x-circle"></i> Clear Filters
+                                </button>
+                                <button class="btn btn-primary" id="refreshBtn">
+                                    <i class="bi bi-arrow-clockwise"></i> Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Summary -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="text-muted">Total Traces</h6>
+                        <h3 id="totalTraces">0</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="text-muted">Avg Duration</h6>
+                        <h3 id="avgDuration">0ms</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="text-muted">Success Rate</h6>
+                        <h3 id="successRate">0%</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="text-muted">Error Rate</h6>
+                        <h3 id="errorRate">0%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Traces List -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Recent Traces</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Trace ID</th>
+                                        <th>Timestamp</th>
+                                        <th>Method</th>
+                                        <th>Path</th>
+                                        <th>Service</th>
+                                        <th>Duration</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tracesTable">
+                                    <!-- Traces will be loaded here -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trace Detail Modal -->
+    <div class="modal fade" id="traceDetailModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-diagram-3"></i> Trace Details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body" id="traceDetailBody">
+                    <!-- Trace details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let allTraces = [];
+        let filteredTraces = [];
+
+        // Fetch traces from API
+        async function fetchTraces() {
+            try {
+                const response = await fetch('/admin/api/metrics');
+                const data = await response.json();
+                allTraces = data.traces || [];
+                applyFilters();
+                updateStats();
+                renderTraces();
+            } catch (error) {
+                console.error('Error fetching traces:', error);
+            }
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+            const methodFilter = document.getElementById('methodFilter').value;
+            const serviceFilter = document.getElementById('serviceFilter').value;
+
+            filteredTraces = allTraces.filter(trace => {
+                // Search filter
+                if (searchTerm && !(
+                    trace.traceId.toLowerCase().includes(searchTerm) ||
+                    trace.path.toLowerCase().includes(searchTerm) ||
+                    trace.service.toLowerCase().includes(searchTerm)
+                )) {
+                    return false;
+                }
+
+                // Status filter
+                if (statusFilter === 'success' && trace.status >= 300) return false;
+                if (statusFilter === 'error' && trace.status < 400) return false;
+
+                // Method filter
+                if (methodFilter && trace.method !== methodFilter) return false;
+
+                // Service filter
+                if (serviceFilter && trace.service !== serviceFilter) return false;
+
+                return true;
+            });
+        }
+
+        // Update statistics
+        function updateStats() {
+            const total = filteredTraces.length;
+            document.getElementById('totalTraces').textContent = total;
+
+            if (total > 0) {
+                const avgDur = filteredTraces.reduce((sum, t) => sum + t.duration, 0) / total;
+                document.getElementById('avgDuration').textContent = avgDur.toFixed(2) + 'ms';
+
+                const successCount = filteredTraces.filter(t => t.status >= 200 && t.status < 300).length;
+                const successRate = (successCount / total * 100).toFixed(1);
+                const errorRate = (100 - successRate).toFixed(1);
+
+                document.getElementById('successRate').textContent = successRate + '%';
+                document.getElementById('errorRate').textContent = errorRate + '%';
+            } else {
+                document.getElementById('avgDuration').textContent = '0ms';
+                document.getElementById('successRate').textContent = '0%';
+                document.getElementById('errorRate').textContent = '0%';
+            }
+
+            // Update service filter options
+            const services = [...new Set(allTraces.map(t => t.service))].sort();
+            const serviceFilter = document.getElementById('serviceFilter');
+            const currentValue = serviceFilter.value;
+            serviceFilter.innerHTML = '<option value="">All Services</option>';
+            services.forEach(service => {
+                const option = document.createElement('option');
+                option.value = service;
+                option.textContent = service;
+                serviceFilter.appendChild(option);
+            });
+            serviceFilter.value = currentValue;
+        }
+
+        // Render traces table
+        function renderTraces() {
+            const tbody = document.getElementById('tracesTable');
+            tbody.innerHTML = '';
+
+            if (filteredTraces.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No traces found</td></tr>';
+                return;
+            }
+
+            // Sort by timestamp (newest first)
+            const sorted = [...filteredTraces].sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+
+            sorted.forEach(trace => {
+                const row = document.createElement('tr');
+                row.className = 'trace-card';
+                
+                const statusClass = trace.status >= 200 && trace.status < 300 ? 'success' : 
+                                   trace.status >= 400 ? 'error' : 'warning';
+                
+                const timestamp = new Date(trace.timestamp).toLocaleString();
+                
+                row.innerHTML = `
+                    <td><code>${trace.traceId.substring(0, 16)}...</code></td>
+                    <td>${timestamp}</td>
+                    <td><span class="badge bg-primary">${trace.method}</span></td>
+                    <td><code>${trace.path}</code></td>
+                    <td>${trace.service}</td>
+                    <td>${trace.duration.toFixed(2)}ms</td>
+                    <td><span class="trace-status ${statusClass}">${trace.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewTraceDetail('${trace.traceId}')">
+                            <i class="bi bi-eye"></i> View
+                        </button>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // View trace detail
+        function viewTraceDetail(traceId) {
+            const trace = allTraces.find(t => t.traceId === traceId);
+            if (!trace) return;
+
+            const statusClass = trace.status >= 200 && trace.status < 300 ? 'success' : 
+                               trace.status >= 400 ? 'error' : 'warning';
+
+            const detailHtml = `
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <strong>Trace ID:</strong><br>
+                        <code>${trace.traceId}</code>
+                    </div>
+                    <div class="col-md-6">
+                        <strong>Span ID:</strong><br>
+                        <code>${trace.spanId}</code>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <strong>Method:</strong><br>
+                        <span class="badge bg-primary">${trace.method}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Status:</strong><br>
+                        <span class="trace-status ${statusClass}">${trace.status}</span>
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Duration:</strong><br>
+                        ${trace.duration.toFixed(2)}ms
+                    </div>
+                    <div class="col-md-3">
+                        <strong>Service:</strong><br>
+                        ${trace.service}
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <strong>Path:</strong><br>
+                        <code>${trace.path}</code>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-12">
+                        <strong>Timestamp:</strong><br>
+                        ${new Date(trace.timestamp).toLocaleString()}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <strong>Timeline:</strong>
+                        <div class="mt-2 p-3 bg-light rounded">
+                            <div class="span-bar span-${statusClass}" style="width: 100%; text-align: center; color: white;">
+                                ${trace.method} ${trace.path} (${trace.duration.toFixed(2)}ms)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('traceDetailBody').innerHTML = detailHtml;
+            new bootstrap.Modal(document.getElementById('traceDetailModal')).show();
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', () => {
+            applyFilters();
+            updateStats();
+            renderTraces();
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', () => {
+            applyFilters();
+            updateStats();
+            renderTraces();
+        });
+
+        document.getElementById('methodFilter').addEventListener('change', () => {
+            applyFilters();
+            updateStats();
+            renderTraces();
+        });
+
+        document.getElementById('serviceFilter').addEventListener('change', () => {
+            applyFilters();
+            updateStats();
+            renderTraces();
+        });
+
+        document.getElementById('clearFilters').addEventListener('click', () => {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('methodFilter').value = '';
+            document.getElementById('serviceFilter').value = '';
+            applyFilters();
+            updateStats();
+            renderTraces();
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', fetchTraces);
+
+        // Initial load and auto-refresh
+        fetchTraces();
+        setInterval(fetchTraces, 5000); // Refresh every 5 seconds
+    </script>
+</body>
+</html>
+{{end}}

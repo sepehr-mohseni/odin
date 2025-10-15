@@ -7,7 +7,9 @@ import (
 	"io"
 	"net/http"
 	"odin/pkg/cache"
+	"odin/pkg/canary"
 	"odin/pkg/service"
+	"odin/pkg/transform"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -17,11 +19,13 @@ import (
 )
 
 type ServiceHandler struct {
-	service    *service.Config
-	logger     *logrus.Logger
-	cacheStore cache.Store
-	client     *http.Client
-	nextTarget uint64
+	service         *service.Config
+	logger          *logrus.Logger
+	cacheStore      cache.Store
+	client          *http.Client
+	nextTarget      uint64
+	canaryRouter    *canary.Router
+	transformEngine *transform.Engine
 }
 
 func NewServiceHandler(svc *service.Config, logger *logrus.Logger, cacheStore cache.Store) (*ServiceHandler, error) {
@@ -34,18 +38,21 @@ func NewServiceHandler(svc *service.Config, logger *logrus.Logger, cacheStore ca
 	}
 
 	return &ServiceHandler{
-		service:    svc,
-		logger:     logger,
-		cacheStore: cacheStore,
-		client:     client,
-		nextTarget: 0,
+		service:         svc,
+		logger:          logger,
+		cacheStore:      cacheStore,
+		client:          client,
+		nextTarget:      0,
+		canaryRouter:    canary.NewRouter(),
+		transformEngine: transform.NewEngine(logger),
 	}, nil
 }
 
 func (h *ServiceHandler) Handle(c echo.Context) error {
 	ctx := c.Request().Context()
 
-	target := h.getTargetURL()
+	// Get target URL with canary routing support
+	target := h.getTargetURL(c.Request())
 	path := c.Request().URL.Path
 
 	if h.service.StripBasePath && strings.HasPrefix(path, h.service.BasePath) {
@@ -60,15 +67,29 @@ func (h *ServiceHandler) Handle(c echo.Context) error {
 		targetURL += "?" + c.Request().URL.RawQuery
 	}
 
-	h.logger.WithFields(logrus.Fields{
+	// Log which target is being used (production or canary)
+	logFields := logrus.Fields{
 		"service": h.service.Name,
 		"target":  targetURL,
 		"method":  c.Request().Method,
-	}).Debug("Forwarding request")
+	}
+	if h.service.Canary != nil && h.service.Canary.Enabled {
+		isCanary := h.canaryRouter.ShouldUseCanary(c.Request(), h.service.Canary)
+		logFields["canary"] = isCanary
+	}
+	h.logger.WithFields(logFields).Debug("Forwarding request")
 
 	req, err := h.createProxyRequest(c, targetURL)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to create proxy request")
+	}
+
+	// Apply request transformations if configured
+	if h.service.Transformation != nil && h.service.Transformation.Request != nil {
+		if err := h.transformEngine.TransformRequest(req, h.service.Transformation.Request); err != nil {
+			h.logger.WithError(err).Warn("Failed to transform request")
+			// Continue without transformation
+		}
 	}
 
 	resp, err := h.doRequestWithRetries(ctx, req)
@@ -77,15 +98,35 @@ func (h *ServiceHandler) Handle(c echo.Context) error {
 	}
 	defer resp.Body.Close()
 
-	for k, vals := range resp.Header {
-		for _, v := range vals {
-			c.Response().Header().Add(k, v)
-		}
-	}
-
+	// Read response body first
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, "Failed to read response body")
+	}
+
+	// Apply response transformations if configured
+	responseHeaders := resp.Header
+	if h.service.Transformation != nil && h.service.Transformation.Response != nil {
+		transformedBody, transformedHeaders, err := h.transformEngine.TransformResponse(
+			body,
+			resp.StatusCode,
+			resp.Header,
+			h.service.Transformation.Response,
+		)
+		if err != nil {
+			h.logger.WithError(err).Warn("Failed to transform response")
+			// Continue with original response
+		} else {
+			body = transformedBody
+			responseHeaders = transformedHeaders
+		}
+	}
+
+	// Copy response headers
+	for k, vals := range responseHeaders {
+		for _, v := range vals {
+			c.Response().Header().Add(k, v)
+		}
 	}
 
 	if h.service.Aggregation != nil {
@@ -98,18 +139,21 @@ func (h *ServiceHandler) Handle(c echo.Context) error {
 	return err
 }
 
-func (h *ServiceHandler) getTargetURL() string {
-	if len(h.service.Targets) == 1 {
-		return h.service.Targets[0]
+func (h *ServiceHandler) getTargetURL(req *http.Request) string {
+	// Get the appropriate target list based on canary routing
+	targets := h.canaryRouter.GetTargets(req, h.service)
+
+	if len(targets) == 1 {
+		return targets[0]
 	}
 
 	switch h.service.LoadBalancing {
 	case "random":
-		idx := time.Now().UnixNano() % int64(len(h.service.Targets))
-		return h.service.Targets[idx]
+		idx := time.Now().UnixNano() % int64(len(targets))
+		return targets[idx]
 	default:
-		idx := atomic.AddUint64(&h.nextTarget, 1) % uint64(len(h.service.Targets))
-		return h.service.Targets[idx]
+		idx := atomic.AddUint64(&h.nextTarget, 1) % uint64(len(targets))
+		return targets[idx]
 	}
 }
 

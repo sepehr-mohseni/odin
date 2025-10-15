@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"odin/pkg/transform"
 	"strings"
 	"time"
 
@@ -9,22 +10,52 @@ import (
 )
 
 type Config struct {
-	Name           string            `yaml:"name"`
-	BasePath       string            `yaml:"basePath"`
-	Targets        []string          `yaml:"targets"`
-	StripBasePath  bool              `yaml:"stripBasePath"`
-	Timeout        time.Duration     `yaml:"timeout"`
-	RetryCount     int               `yaml:"retryCount"`
-	RetryDelay     time.Duration     `yaml:"retryDelay"`
-	Authentication bool              `yaml:"authentication"`
-	LoadBalancing  string            `yaml:"loadBalancing"`
-	Headers        map[string]string `yaml:"headers"`
-	Protocol       string            `yaml:"protocol"`
+	Name           string                `yaml:"name"`
+	BasePath       string                `yaml:"basePath"`
+	Targets        []string              `yaml:"targets"`
+	StripBasePath  bool                  `yaml:"stripBasePath"`
+	Timeout        time.Duration         `yaml:"timeout"`
+	RetryCount     int                   `yaml:"retryCount"`
+	RetryDelay     time.Duration         `yaml:"retryDelay"`
+	Authentication bool                  `yaml:"authentication"`
+	LoadBalancing  string                `yaml:"loadBalancing"`
+	Headers        map[string]string     `yaml:"headers"`
+	Protocol       string                `yaml:"protocol"`
+	Canary         *CanaryConfig         `yaml:"canary,omitempty"`
+	Transformation *TransformationConfig `yaml:"transformation,omitempty"`
 	Transform      struct {
 		Request  []TransformRule `yaml:"request"`
 		Response []TransformRule `yaml:"response"`
-	} `yaml:"transform"`
+	} `yaml:"transform"` // Legacy field, kept for backward compatibility
 	Aggregation *AggregationConfig `yaml:"aggregation,omitempty"`
+	HealthCheck *HealthCheckConfig `yaml:"healthCheck,omitempty"`
+}
+
+// TransformationConfig holds the new template-based transformation settings
+type TransformationConfig struct {
+	Request  *transform.RequestTransform  `yaml:"request,omitempty"`
+	Response *transform.ResponseTransform `yaml:"response,omitempty"`
+}
+
+type CanaryConfig struct {
+	Enabled     bool     `yaml:"enabled"`
+	Targets     []string `yaml:"targets"`
+	Weight      int      `yaml:"weight"` // Percentage of traffic (0-100)
+	Header      string   `yaml:"header,omitempty"`
+	HeaderValue string   `yaml:"headerValue,omitempty"`
+	CookieName  string   `yaml:"cookieName,omitempty"`
+	CookieValue string   `yaml:"cookieValue,omitempty"`
+}
+
+// HealthCheckConfig holds health check settings for backend targets
+type HealthCheckConfig struct {
+	Enabled            bool          `yaml:"enabled"`
+	Interval           time.Duration `yaml:"interval"`           // How often to check (default: 30s)
+	Timeout            time.Duration `yaml:"timeout"`            // Request timeout (default: 5s)
+	UnhealthyThreshold int           `yaml:"unhealthyThreshold"` // Failures before unhealthy (default: 3)
+	HealthyThreshold   int           `yaml:"healthyThreshold"`   // Successes before healthy (default: 2)
+	ExpectedStatus     []int         `yaml:"expectedStatus"`     // Expected HTTP status codes (default: [200, 204])
+	InsecureSkipVerify bool          `yaml:"insecureSkipVerify"` // Skip TLS verification
 }
 
 type AggregationConfig struct {
