@@ -9,6 +9,18 @@ build:
 	@echo "Building Odin API Gateway..."
 	go build $(LDFLAGS) -o bin/$(BINARY_NAME) cmd/odin/main.go
 
+migrate-dry-run:
+	@echo "Running MongoDB migration (dry run)..."
+	./bin/odin-migrate --config config/config.yaml --dry-run --verbose
+
+migrate:
+	@echo "Running MongoDB migration..."
+	./bin/odin-migrate --config config/config.yaml --verbose
+
+migrate-force:
+	@echo "Running MongoDB migration (force override)..."
+	./bin/odin-migrate --config config/config.yaml --force --verbose
+
 run: build
 	@echo "Running Odin API Gateway..."
 	./bin/$(BINARY_NAME) --config config/config.yaml
@@ -119,6 +131,13 @@ build-plugins:
 clean-plugins:
 	@echo "Cleaning plugin artifacts..."
 	rm -rf plugins/*.so
+
+build-all-tools:
+	@echo "Building Odin API Gateway and migration tool..."
+	go build $(LDFLAGS) -o bin/$(BINARY_NAME) cmd/odin/main.go
+	go build $(LDFLAGS) -o bin/odin-gateway cmd/gateway/main.go
+	go build $(LDFLAGS) -o bin/odin-migrate cmd/migrate/main.go
+	@echo "✅ Built: bin/$(BINARY_NAME), bin/odin-gateway, bin/odin-migrate"
 
 build-all: build build-plugins
 	@echo "Built gateway and plugins successfully"

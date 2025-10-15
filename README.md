@@ -48,6 +48,9 @@ _A lightning-fast, feature-rich API Gateway built with Go_
 - **🧩 Plugin System** - Extensible architecture with custom plugins
 - **📊 GraphQL Proxy** - Query validation, caching, and security
 - **⚡ gRPC Support** - HTTP-to-gRPC transcoding
+- **🗄️ MongoDB Integration** - Centralized storage for config and metrics
+- **🔌 WASM Extensions** - Lightweight, secure plugin runtime
+- **🌐 Multi-Cluster** - Global load balancing across clusters
 
 </td>
 </tr>
@@ -59,6 +62,7 @@ _A lightning-fast, feature-rich API Gateway built with Go_
 
 - Go 1.21 or higher
 - Redis (optional, for distributed rate limiting and caching)
+- MongoDB (optional, for persistent storage and metrics)
 
 ### Installation
 

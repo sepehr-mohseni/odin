@@ -1,0 +1,191 @@
+# MongoDB Configuration Example
+# This file shows how to configure MongoDB for storing Odin gateway data
+
+# MongoDB connection settings
+mongodb:
+  # Enable or disable MongoDB integration
+  # When disabled, Odin will use file-based storage
+  enabled: true
+
+  # MongoDB connection URI
+  # Format: mongodb://[username:password@]host1[:port1][,...hostN[:portN]][/[defaultauthdb][?options]]
+  # For local development:
+  uri: "mongodb://localhost:27017"
+  
+  # For production with authentication:
+  # uri: "mongodb://odin_user:secure_password@mongodb1.example.com:27017,mongodb2.example.com:27017,mongodb3.example.com:27017/?replicaSet=rs0"
+  
+  # For MongoDB Atlas:
+  # uri: "mongodb+srv://odin_user:secure_password@cluster0.mongodb.net/?retryWrites=true&w=majority"
+
+  # Database name for storing gateway data
+  database: "odin_gateway"
+
+  # Connection pool settings
+  maxPoolSize: 100
+  minPoolSize: 10
+
+  # Connection timeout (e.g., "10s", "30s", "1m")
+  connectTimeout: "10s"
+
+  # Authentication settings (optional if included in URI)
+  auth:
+    username: ""
+    password: ""
+    # Authentication database (default: admin)
+    authDB: "admin"
+
+  # TLS/SSL configuration (recommended for production)
+  tls:
+    enabled: false
+    # Path to CA certificate file
+    caFile: ""
+    # Path to client certificate file
+    certFile: ""
+    # Path to client certificate key file
+    keyFile: ""
+
+# ==============================================================================
+# MongoDB Atlas Configuration Example
+# ==============================================================================
+# For MongoDB Atlas cloud deployment:
+#
+# mongodb:
+#   enabled: true
+#   uri: "mongodb+srv://odin_user:YourStrongPassword123@cluster0.abcdef.mongodb.net/?retryWrites=true&w=majority"
+#   database: "odin_gateway"
+#   maxPoolSize: 50
+#   minPoolSize: 5
+#   connectTimeout: "30s"
+#   tls:
+#     enabled: true
+
+# ==============================================================================
+# MongoDB Replica Set Configuration Example
+# ==============================================================================
+# For production with replica sets:
+#
+# mongodb:
+#   enabled: true
+#   uri: "mongodb://mongodb1.example.com:27017,mongodb2.example.com:27017,mongodb3.example.com:27017/?replicaSet=rs0"
+#   database: "odin_gateway"
+#   maxPoolSize: 200
+#   minPoolSize: 20
+#   connectTimeout: "15s"
+#   auth:
+#     username: "odin_admin"
+#     password: "SecurePassword123"
+#     authDB: "admin"
+#   tls:
+#     enabled: true
+#     caFile: "/etc/odin/certs/ca.pem"
+#     certFile: "/etc/odin/certs/client.pem"
+#     keyFile: "/etc/odin/certs/client-key.pem"
+
+# ==============================================================================
+# MongoDB Local Development Configuration
+# ==============================================================================
+# For local development without authentication:
+#
+# mongodb:
+#   enabled: true
+#   uri: "mongodb://localhost:27017"
+#   database: "odin_dev"
+#   maxPoolSize: 20
+#   minPoolSize: 2
+#   connectTimeout: "5s"
+
+# ==============================================================================
+# Collections and Data Retention
+# ==============================================================================
+# Odin automatically creates and manages the following MongoDB collections:
+#
+# 1. services - Service configurations and endpoint definitions
+# 2. config - Versioned gateway configuration snapshots
+# 3. metrics - Performance metrics with 30-day TTL
+# 4. traces - Distributed tracing data with 7-day TTL
+# 5. alerts - Alert notifications and status
+# 6. health_checks - Service health check results with 24-hour TTL
+# 7. clusters - Multi-cluster configuration and status
+# 8. plugins - WASM plugin metadata and configuration
+# 9. users - Admin users and authentication data
+# 10. api_keys - API key authentication credentials
+# 11. rate_limits - Rate limiting state and counters
+# 12. cache - Response cache with custom expiration
+# 13. audit_logs - Audit trail for all configuration changes with 90-day TTL
+#
+# TTL (Time To Live) indexes are automatically created for collections that
+# store time-series data, ensuring old data is automatically cleaned up.
+
+# ==============================================================================
+# Migration from File-Based Configuration
+# ==============================================================================
+# To migrate existing configuration from YAML files to MongoDB:
+#
+# 1. Start Odin with MongoDB disabled (enabled: false)
+# 2. Run the migration tool:
+#    ./odin migrate --from-yaml --mongodb-uri="mongodb://localhost:27017" --database="odin_gateway"
+# 3. Verify data in MongoDB:
+#    mongosh odin_gateway --eval "db.services.find().pretty()"
+# 4. Enable MongoDB in configuration (enabled: true)
+# 5. Restart Odin
+#
+# After migration, services and configuration can be managed via:
+# - Admin UI (http://localhost:8080/admin)
+# - REST API endpoints
+# - Direct MongoDB queries
+
+# ==============================================================================
+# Security Best Practices
+# ==============================================================================
+# 1. Always use strong, unique passwords
+# 2. Enable TLS/SSL for production deployments
+# 3. Use role-based access control (RBAC) in MongoDB
+# 4. Restrict network access to MongoDB using firewall rules
+# 5. Enable MongoDB audit logging
+# 6. Regularly backup your MongoDB database
+# 7. Monitor MongoDB performance and errors
+# 8. Keep MongoDB and drivers up to date
+#
+# Example MongoDB user creation with minimum required privileges:
+# ```
+# use admin
+# db.createUser({
+#   user: "odin_user",
+#   pwd: "SecurePassword123",
+#   roles: [
+#     { role: "readWrite", db: "odin_gateway" },
+#     { role: "dbAdmin", db: "odin_gateway" }
+#   ]
+# })
+# ```
+
+# ==============================================================================
+# Backup and Restore
+# ==============================================================================
+# Backup MongoDB data:
+# mongodump --uri="mongodb://localhost:27017" --db=odin_gateway --out=/backup/odin
+#
+# Restore MongoDB data:
+# mongorestore --uri="mongodb://localhost:27017" --db=odin_gateway /backup/odin/odin_gateway
+#
+# For production, use MongoDB Atlas automated backups or set up:
+# - Continuous backup with replica sets
+# - Point-in-time recovery
+# - Automated snapshot schedules
+
+# ==============================================================================
+# Monitoring
+# ==============================================================================
+# Monitor MongoDB health via:
+# - MongoDB Atlas monitoring dashboard
+# - Prometheus MongoDB exporter
+# - Odin health endpoint: GET /health (includes MongoDB status)
+# - MongoDB logs and slow query logs
+#
+# Key metrics to monitor:
+# - Connection pool usage
+# - Query performance
+# - Disk usage
+# - Replication lag
+# - Index efficiency

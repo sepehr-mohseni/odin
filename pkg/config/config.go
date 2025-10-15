@@ -25,6 +25,7 @@ type Config struct {
 	WASM         WASMConfig         `yaml:"wasm"`
 	MultiCluster MultiClusterConfig `yaml:"multiCluster"`
 	OpenAPI      OpenAPIConfig      `yaml:"openapi"`
+	MongoDB      MongoDBConfig      `yaml:"mongodb"`
 }
 
 type ServerConfig struct {
@@ -218,6 +219,30 @@ type OpenAPIConfig struct {
 	OutputPath   string `yaml:"outputPath"`
 	UIEnabled    bool   `yaml:"uiEnabled"`
 	UIPath       string `yaml:"uiPath"`
+}
+
+type MongoDBConfig struct {
+	Enabled        bool          `yaml:"enabled"`
+	URI            string        `yaml:"uri"`
+	Database       string        `yaml:"database"`
+	MaxPoolSize    int           `yaml:"maxPoolSize"`
+	MinPoolSize    int           `yaml:"minPoolSize"`
+	ConnectTimeout time.Duration `yaml:"connectTimeout"`
+	Auth           MongoDBAuth   `yaml:"auth"`
+	TLS            MongoDBTLS    `yaml:"tls"`
+}
+
+type MongoDBAuth struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+	AuthDB   string `yaml:"authDB"`
+}
+
+type MongoDBTLS struct {
+	Enabled  bool   `yaml:"enabled"`
+	CAFile   string `yaml:"caFile"`
+	CertFile string `yaml:"certFile"`
+	KeyFile  string `yaml:"keyFile"`
 }
 
 type ServiceConfig struct {

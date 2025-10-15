@@ -22,16 +22,25 @@ odin/
 │   ├── aggregator/       # Response aggregation
 │   ├── auth/             # Authentication
 │   ├── cache/            # Caching
+│   ├── circuit/          # Circuit breaker
 │   ├── config/           # Configuration loading
+│   ├── debug/            # Debug tools
+│   ├── errors/           # Error handling
 │   ├── gateway/          # Core gateway functionality
 │   ├── health/           # Health checks
 │   ├── logging/          # Logging
 │   ├── middleware/       # Request middleware
+│   ├── mongodb/          # MongoDB integration
 │   ├── monitoring/       # Metrics and monitoring
+│   ├── multicluster/     # Multi-cluster management
+│   ├── openapi/          # OpenAPI generation/import
 │   ├── proxy/            # Request proxying
+│   ├── ratelimit/        # Rate limiting
 │   ├── routing/          # Request routing
 │   ├── service/          # Service management
-│   └── utils/            # Utility functions
+│   ├── utils/            # Utility functions
+│   ├── wasm/             # WASM plugin runtime
+│   └── websocket/        # WebSocket proxying
 └── test/                 # Test code and mock services
     ├── auth/             # Authentication tests
     ├── integration/      # Integration tests
