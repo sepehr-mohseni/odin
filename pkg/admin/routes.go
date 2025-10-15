@@ -20,6 +20,14 @@ func (h *AdminHandler) Register(e *echo.Echo) {
 
 	protected.GET("/dashboard", h.handleDashboard)
 
+	// Monitoring routes
+	protected.GET("/monitoring", h.handleMonitoring)
+	protected.GET("/api/monitoring/metrics", GetMetricsAPI)
+	protected.GET("/ws/monitoring", WebSocketMonitoring)
+
+	// Debug endpoint for testing (remove in production)
+	adminGroup.GET("/debug/metrics", GetMetricsAPI)
+
 	protected.GET("/services", h.handleListServices)
 	protected.GET("/services/new", h.handleNewService)
 	protected.POST("/services", h.handleAddService)
@@ -32,4 +40,8 @@ func (h *AdminHandler) Register(e *echo.Echo) {
 
 func (h *AdminHandler) handleDashboard(c echo.Context) error {
 	return h.renderTemplate(c, "dashboard.html", nil)
+}
+
+func (h *AdminHandler) handleMonitoring(c echo.Context) error {
+	return h.renderTemplate(c, "monitoring.html", nil)
 }

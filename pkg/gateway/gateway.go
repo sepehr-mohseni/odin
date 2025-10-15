@@ -19,10 +19,12 @@ import (
 	"odin/pkg/plugins"
 	"odin/pkg/routing"
 	"odin/pkg/service"
+	"odin/pkg/tracing"
 
 	"github.com/labstack/echo/v4"
 	echomw "github.com/labstack/echo/v4/middleware"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/labstack/echo/otelecho"
 )
 
 type Gateway struct {
@@ -33,10 +35,35 @@ type Gateway struct {
 	serviceRegistry *service.Registry
 	router          *routing.Router
 	pluginManager   *plugins.PluginManager
+	tracingManager  *tracing.Manager
 }
 
 func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway, error) {
 	e := echo.New()
+
+	// Initialize distributed tracing
+	tracingConfig := tracing.Config{
+		Enabled:        cfg.Tracing.Enabled,
+		ServiceName:    cfg.Tracing.ServiceName,
+		ServiceVersion: cfg.Tracing.ServiceVersion,
+		Environment:    cfg.Tracing.Environment,
+		Endpoint:       cfg.Tracing.Endpoint,
+		SampleRate:     cfg.Tracing.SampleRate,
+		Insecure:       cfg.Tracing.Insecure,
+	}
+
+	tracingManager, err := tracing.NewManager(tracingConfig, logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize tracing: %w", err)
+	}
+
+	// Add OpenTelemetry middleware for Echo
+	if cfg.Tracing.Enabled {
+		e.Use(otelecho.Middleware(cfg.Tracing.ServiceName))
+	}
+
+	// Add monitoring middleware
+	e.Use(middleware.MonitoringMiddleware())
 
 	agg := aggregator.New(logger, cfg.Services)
 
@@ -148,6 +175,7 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 		serviceRegistry: registry,
 		router:          router,
 		pluginManager:   pluginManager,
+		tracingManager:  tracingManager,
 	}
 
 	// Setup protocol-specific proxies
@@ -244,6 +272,11 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 
 	adminHandler.Register(e)
 	logger.Info("Admin interface registered at /admin")
+
+	// Start monitoring metrics broadcaster
+	collector := admin.GetCollector()
+	collector.StartMetricsBroadcaster()
+	logger.Info("Monitoring metrics broadcaster started")
 
 	return gateway, nil
 }

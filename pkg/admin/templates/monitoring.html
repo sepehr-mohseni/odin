@@ -1,0 +1,562 @@
+{{define "monitoring.html"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Odin API Gateway - Real-time Monitoring</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/date-fns@2.29.3/index.min.js"></script>
+    <style>
+      body {
+        background-color: #f8f9fa;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      
+      .metric-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        transition: transform 0.2s ease;
+      }
+      
+      .metric-card:hover {
+        transform: translateY(-2px);
+      }
+      
+      .metric-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        margin: 0;
+      }
+      
+      .metric-label {
+        font-size: 0.9rem;
+        opacity: 0.9;
+        margin-bottom: 0.5rem;
+      }
+      
+      .metric-change {
+        font-size: 0.8rem;
+        opacity: 0.8;
+      }
+      
+      .chart-container {
+        background: white;
+        border-radius: 15px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        height: 300px;
+        max-height: 300px;
+      }
+      
+      .service-status {
+        background: white;
+        border-radius: 15px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      }
+      
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+      }
+      
+      .status-healthy { background-color: #28a745; }
+      .status-warning { background-color: #ffc107; }
+      .status-error { background-color: #dc3545; }
+      
+      .trace-item {
+        padding: 0.75rem;
+        border-bottom: 1px solid #eee;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.85rem;
+      }
+      
+      .trace-item:last-child {
+        border-bottom: none;
+      }
+      
+      .duration-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 10px;
+      }
+      
+      .duration-fast { background-color: #d4edda; color: #155724; }
+      .duration-medium { background-color: #fff3cd; color: #856404; }
+      .duration-slow { background-color: #f8d7da; color: #721c24; }
+      
+      .nav-link.active {
+        font-weight: bold;
+        background-color: #667eea !important;
+        color: white !important;
+      }
+      
+      .sidebar {
+        min-height: calc(100vh - 100px);
+        background: white;
+        border-radius: 15px;
+        padding: 1rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+      }
+      
+      .auto-refresh {
+        font-size: 0.8rem;
+        color: #6c757d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <!-- Header -->
+      <header class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom">
+        <a href="/admin/dashboard" class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none">
+          <span class="fs-4">🔍 Odin Monitoring</span>
+        </a>
+        <ul class="nav nav-pills">
+          <li class="nav-item">
+            <a href="/admin/dashboard" class="nav-link">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/monitoring" class="nav-link active">Monitoring</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/services/new" class="nav-link">Add Service</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/login" class="nav-link">Logout</a>
+          </li>
+        </ul>
+      </header>
+
+      <div class="row">
+        <!-- Sidebar -->
+        <div class="col-md-3">
+          <div class="sidebar">
+            <h6 class="text-muted mb-3">QUICK METRICS</h6>
+            
+            <!-- Key Metrics -->
+            <div class="metric-card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+              <div class="metric-label">Total Requests</div>
+              <div class="metric-value" id="total-requests">0</div>
+              <div class="metric-change" id="requests-change">+0% from last hour</div>
+            </div>
+            
+            <div class="metric-card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);">
+              <div class="metric-label">Avg Response Time</div>
+              <div class="metric-value" id="avg-response-time">0ms</div>
+              <div class="metric-change" id="response-time-change">+0% from last hour</div>
+            </div>
+            
+            <div class="metric-card" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);">
+              <div class="metric-label">Active Connections</div>
+              <div class="metric-value" id="active-connections">0</div>
+              <div class="metric-change" id="connections-change">Real-time</div>
+            </div>
+            
+            <div class="metric-card" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);">
+              <div class="metric-label">Success Rate</div>
+              <div class="metric-value" id="success-rate">0%</div>
+              <div class="metric-change" id="success-rate-change">+0% from last hour</div>
+            </div>
+
+            <!-- Auto-refresh indicator -->
+            <div class="text-center mt-3">
+              <span class="auto-refresh">🔄 Auto-refresh: <span id="refresh-countdown">30</span>s</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="col-md-9">
+          <!-- Charts Row -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="chart-container">
+                <h6 class="text-muted mb-3">REQUEST RATE (per minute)</h6>
+                <canvas id="requestRateChart" height="200"></canvas>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="chart-container">
+                <h6 class="text-muted mb-3">RESPONSE TIME DISTRIBUTION</h6>
+                <canvas id="responseTimeChart" height="200"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <div class="row">
+            <div class="col-md-12">
+              <div class="chart-container">
+                <h6 class="text-muted mb-3">SERVICE HEALTH & STATUS CODES</h6>
+                <canvas id="statusCodesChart" height="150"></canvas>
+              </div>
+            </div>
+          </div>
+
+          <!-- Service Status -->
+          <div class="row">
+            <div class="col-md-6">
+              <div class="service-status">
+                <h6 class="text-muted mb-3">SERVICE STATUS</h6>
+                <div id="service-status-list">
+                  <!-- Services will be populated here -->
+                </div>
+              </div>
+            </div>
+            
+            <!-- Recent Traces -->
+            <div class="col-md-6">
+              <div class="service-status">
+                <h6 class="text-muted mb-3">RECENT TRACES</h6>
+                <div id="traces-list" style="max-height: 300px; overflow-y: auto;">
+                  <!-- Traces will be populated here -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // WebSocket connection for real-time updates
+      let ws;
+      let charts = {};
+      let refreshInterval;
+      let countdownInterval;
+      let refreshCountdown = 30;
+
+      // Initialize WebSocket connection
+      function initWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/admin/ws/monitoring`;
+        
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = function() {
+          console.log('WebSocket connected');
+          updateConnectionStatus(true);
+        };
+        
+        ws.onmessage = function(event) {
+          const data = JSON.parse(event.data);
+          updateMetrics(data);
+        };
+        
+        ws.onclose = function() {
+          console.log('WebSocket disconnected');
+          updateConnectionStatus(false);
+          // Reconnect after 5 seconds
+          setTimeout(initWebSocket, 5000);
+        };
+        
+        ws.onerror = function(error) {
+          console.error('WebSocket error:', error);
+          updateConnectionStatus(false);
+        };
+      }
+
+      // Initialize charts
+      function initCharts() {
+        // Request Rate Chart
+        const requestCtx = document.getElementById('requestRateChart').getContext('2d');
+        charts.requestRate = new Chart(requestCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [{
+              label: 'Requests/min',
+              data: [],
+              borderColor: '#667eea',
+              backgroundColor: 'rgba(102, 126, 234, 0.1)',
+              tension: 0.4,
+              fill: true
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+              legend: { display: false }
+            },
+            scales: {
+              y: { beginAtZero: true }
+            }
+          }
+        });
+
+        // Response Time Chart
+        const responseCtx = document.getElementById('responseTimeChart').getContext('2d');
+        charts.responseTime = new Chart(responseCtx, {
+          type: 'line',
+          data: {
+            labels: [],
+            datasets: [
+              {
+                label: 'P50',
+                data: [],
+                borderColor: '#43e97b',
+                backgroundColor: 'rgba(67, 233, 123, 0.1)',
+                tension: 0.4
+              },
+              {
+                label: 'P90',
+                data: [],
+                borderColor: '#f5576c',
+                backgroundColor: 'rgba(245, 87, 108, 0.1)',
+                tension: 0.4
+              },
+              {
+                label: 'P99',
+                data: [],
+                borderColor: '#f093fb',
+                backgroundColor: 'rgba(240, 147, 251, 0.1)',
+                tension: 0.4
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+              legend: { display: true, position: 'top' }
+            },
+            scales: {
+              y: { beginAtZero: true, title: { display: true, text: 'ms' } }
+            }
+          }
+        });
+
+        // Status Codes Chart
+        const statusCtx = document.getElementById('statusCodesChart').getContext('2d');
+        charts.statusCodes = new Chart(statusCtx, {
+          type: 'doughnut',
+          data: {
+            labels: ['2xx Success', '3xx Redirect', '4xx Client Error', '5xx Server Error'],
+            datasets: [{
+              data: [0, 0, 0, 0],
+              backgroundColor: ['#28a745', '#17a2b8', '#ffc107', '#dc3545']
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            plugins: {
+              legend: { position: 'right' }
+            }
+          }
+        });
+      }
+
+      // Update metrics with new data
+      function updateMetrics(data) {
+        // Update key metrics
+        if (data.totalRequests !== undefined) {
+          document.getElementById('total-requests').textContent = formatNumber(data.totalRequests);
+        }
+        
+        if (data.avgResponseTime !== undefined) {
+          document.getElementById('avg-response-time').textContent = data.avgResponseTime.toFixed(2) + 'ms';
+        }
+        
+        if (data.activeConnections !== undefined) {
+          document.getElementById('active-connections').textContent = data.activeConnections;
+        }
+        
+        if (data.successRate !== undefined) {
+          document.getElementById('success-rate').textContent = (data.successRate * 100).toFixed(1) + '%';
+        }
+
+        // Update charts
+        if (data.requestRate) {
+          updateChart(charts.requestRate, data.requestRate);
+        }
+        
+        if (data.responseTime) {
+          updateResponseTimeChart(data.responseTime);
+        }
+        
+        if (data.statusCodes) {
+          updateStatusCodesChart(data.statusCodes);
+        }
+        
+        if (data.services) {
+          updateServiceStatus(data.services);
+        }
+        
+        if (data.traces) {
+          updateTraces(data.traces);
+        }
+      }
+
+      // Update chart data
+      function updateChart(chart, newData) {
+        const now = new Date();
+        const timeLabel = now.toLocaleTimeString();
+        
+        chart.data.labels.push(timeLabel);
+        chart.data.datasets[0].data.push(newData);
+        
+        // Keep only last 20 data points
+        if (chart.data.labels.length > 20) {
+          chart.data.labels.shift();
+          chart.data.datasets[0].data.shift();
+        }
+        
+        chart.update('none');
+      }
+
+      // Update response time chart
+      function updateResponseTimeChart(data) {
+        const now = new Date();
+        const timeLabel = now.toLocaleTimeString();
+        
+        charts.responseTime.data.labels.push(timeLabel);
+        charts.responseTime.data.datasets[0].data.push(data.p50);
+        charts.responseTime.data.datasets[1].data.push(data.p90);
+        charts.responseTime.data.datasets[2].data.push(data.p99);
+        
+        // Keep only last 20 data points
+        if (charts.responseTime.data.labels.length > 20) {
+          charts.responseTime.data.labels.shift();
+          charts.responseTime.data.datasets.forEach(dataset => dataset.data.shift());
+        }
+        
+        charts.responseTime.update('none');
+      }
+
+      // Update status codes chart
+      function updateStatusCodesChart(data) {
+        charts.statusCodes.data.datasets[0].data = [
+          data.success || 0,
+          data.redirect || 0,
+          data.clientError || 0,
+          data.serverError || 0
+        ];
+        charts.statusCodes.update('none');
+      }
+
+      // Update service status
+      function updateServiceStatus(services) {
+        const container = document.getElementById('service-status-list');
+        container.innerHTML = '';
+        
+        services.forEach(service => {
+          const statusClass = service.healthy ? 'status-healthy' : 
+                             service.warning ? 'status-warning' : 'status-error';
+          
+          const div = document.createElement('div');
+          div.className = 'd-flex justify-content-between align-items-center mb-2';
+          div.innerHTML = `
+            <div>
+              <span class="status-indicator ${statusClass}"></span>
+              <strong>${service.name}</strong>
+              <small class="text-muted">(${service.protocol})</small>
+            </div>
+            <div>
+              <small>${service.responseTime.toFixed(2)}ms</small>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      // Update traces
+      function updateTraces(traces) {
+        const container = document.getElementById('traces-list');
+        container.innerHTML = '';
+        
+        traces.slice(0, 10).forEach(trace => {
+          const durationClass = trace.duration < 100 ? 'duration-fast' :
+                               trace.duration < 500 ? 'duration-medium' : 'duration-slow';
+          
+          const div = document.createElement('div');
+          div.className = 'trace-item';
+          div.innerHTML = `
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <strong>${trace.method}</strong> ${trace.path}
+                <br>
+                <small class="text-muted">${trace.service} • ${new Date(trace.timestamp).toLocaleTimeString()}</small>
+              </div>
+              <span class="duration-badge ${durationClass}">${trace.duration.toFixed(2)}ms</span>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      // Update connection status
+      function updateConnectionStatus(connected) {
+        const refreshElement = document.querySelector('.auto-refresh');
+        if (connected) {
+          refreshElement.style.color = '#28a745';
+        } else {
+          refreshElement.style.color = '#dc3545';
+        }
+      }
+
+      // Format large numbers
+      function formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+        return num.toString();
+      }
+
+      // Start refresh countdown
+      function startCountdown() {
+        countdownInterval = setInterval(() => {
+          refreshCountdown--;
+          document.getElementById('refresh-countdown').textContent = refreshCountdown;
+          
+          if (refreshCountdown <= 0) {
+            refreshCountdown = 30;
+            // Fetch fresh data
+            fetch('/admin/api/monitoring/metrics')
+              .then(response => response.json())
+              .then(data => updateMetrics(data))
+              .catch(error => console.error('Error fetching metrics:', error));
+          }
+        }, 1000);
+      }
+
+      // Initialize everything
+      document.addEventListener('DOMContentLoaded', function() {
+        initCharts();
+        initWebSocket();
+        startCountdown();
+        
+        // Initial data fetch
+        fetch('/admin/api/monitoring/metrics')
+          .then(response => response.json())
+          .then(data => updateMetrics(data))
+          .catch(error => console.error('Error fetching initial metrics:', error));
+      });
+
+      // Cleanup on page unload
+      window.addEventListener('beforeunload', function() {
+        if (ws) ws.close();
+        if (countdownInterval) clearInterval(countdownInterval);
+      });
+    </script>
+  </body>
+</html>
+{{end}}

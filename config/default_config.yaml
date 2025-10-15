@@ -15,6 +15,7 @@ monitoring:
 cache:
   enabled: true
   type: memory # memory or redis
+  strategy: local
   ttl: 60s
   redis:
     host: localhost
@@ -41,9 +42,7 @@ admin:
   passwordHash: '$2a$10$3euPcmQFCiblsZeEu5s7p.9mSMuPJHj7nHnbGKgIZzJtLy0WsMUJO'
 
 services:
-  # Example service configuration
-  users:
-    name: users
+  - name: users
     basePath: /api/users
     stripBasePath: true
     targets:
@@ -53,8 +52,7 @@ services:
     authentication: true
     loadBalancing: round-robin
 
-  products:
-    name: products
+  - name: products
     basePath: /api/products
     stripBasePath: true
     targets:

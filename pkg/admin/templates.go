@@ -54,9 +54,11 @@ func (h *AdminHandler) renderTemplate(c echo.Context, templateName string, data 
 		return c.JSON(http.StatusOK, data)
 	}
 
-	tmpl, err := template.ParseFiles(filepath.Join(templateDir, templateName))
+	// Parse all template files together to support includes
+	pattern := filepath.Join(templateDir, "*.html")
+	tmpl, err := template.ParseGlob(pattern)
 	if err != nil {
-		h.logger.WithError(err).Errorf("Failed to parse template: %s", templateName)
+		h.logger.WithError(err).Errorf("Failed to parse templates")
 
 		content := getTemplateContent(templateName)
 		if content != "Template not found" {
@@ -71,7 +73,7 @@ func (h *AdminHandler) renderTemplate(c echo.Context, templateName string, data 
 	}
 
 	var output strings.Builder
-	if err := tmpl.Execute(&output, data); err != nil {
+	if err := tmpl.ExecuteTemplate(&output, templateName, data); err != nil {
 		h.logger.WithError(err).Errorf("Failed to execute template: %s", templateName)
 		return c.String(http.StatusInternalServerError, "Template execution error")
 	}
@@ -90,6 +92,8 @@ func getTemplateContent(name string) string {
 		return addServiceTemplate
 	case "edit_service.html":
 		return editServiceTemplate
+	case "monitoring.html":
+		return "" // Will be loaded from file
 	case "service_list.html":
 		return `{{define "service_list.html"}}
 <table class="table table-striped">

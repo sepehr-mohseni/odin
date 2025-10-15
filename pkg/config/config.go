@@ -19,6 +19,7 @@ type Config struct {
 	Monitoring MonitoringConfig `yaml:"monitoring"`
 	Admin      AdminConfig      `yaml:"admin"`
 	Plugins    PluginsConfig    `yaml:"plugins"`
+	Tracing    TracingConfig    `yaml:"tracing"`
 	Services   []ServiceConfig  `yaml:"services"`
 }
 
@@ -82,6 +83,16 @@ type CacheConfig struct {
 type MonitoringConfig struct {
 	Enabled bool   `yaml:"enabled"`
 	Path    string `yaml:"path"`
+}
+
+type TracingConfig struct {
+	Enabled        bool    `yaml:"enabled"`
+	ServiceName    string  `yaml:"serviceName"`
+	ServiceVersion string  `yaml:"serviceVersion"`
+	Environment    string  `yaml:"environment"`
+	Endpoint       string  `yaml:"endpoint"`
+	SampleRate     float64 `yaml:"sampleRate"`
+	Insecure       bool    `yaml:"insecure"`
 }
 
 type ServiceConfig struct {
@@ -200,6 +211,23 @@ func Load(configPath string, logger *logrus.Logger) (*Config, error) {
 
 	if config.Monitoring.Path == "" {
 		config.Monitoring.Path = "/metrics"
+	}
+
+	// Set tracing defaults
+	if config.Tracing.ServiceName == "" {
+		config.Tracing.ServiceName = "odin-gateway"
+	}
+	if config.Tracing.ServiceVersion == "" {
+		config.Tracing.ServiceVersion = "1.0.0"
+	}
+	if config.Tracing.Environment == "" {
+		config.Tracing.Environment = "development"
+	}
+	if config.Tracing.Endpoint == "" {
+		config.Tracing.Endpoint = "http://localhost:4318/v1/traces"
+	}
+	if config.Tracing.SampleRate == 0 {
+		config.Tracing.SampleRate = 1.0
 	}
 
 	// Load services from external file if available
