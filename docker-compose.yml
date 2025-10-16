@@ -12,6 +12,8 @@ services:
       - ./config:/app/config
     depends_on:
       - redis
+      - mongodb
+      - odin-grok
       - users-service
       - products-service
       - orders-service
@@ -27,6 +29,38 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    restart: unless-stopped
+
+  odin-grok:
+    build:
+      context: ./deployments/grok
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000'
+    environment:
+      - GROK_MODE=lightweight
+      - PORT=8000
+    networks:
+      - odin-network
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:8000/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb-data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=password
+    networks:
+      - odin-network
     restart: unless-stopped
 
   redis:
@@ -121,5 +155,6 @@ networks:
 
 volumes:
   redis-data:
+  mongodb-data:
   prometheus-data:
   grafana-data:

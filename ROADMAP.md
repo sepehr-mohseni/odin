@@ -4,7 +4,6 @@ This document outlines the planned future development for the Odin API Gateway p
 
 ## Long-term Goals (6-12 months)
 
-- [ ] Add AI-powered traffic analysis and anomaly detection using dockerized grok 1 open release "https://github.com/xai-org/grok-1"
 - [ ] Ability to add Go plugin and register as middleware from admin panel similar to Traefik api gateway plugin registration
 - [ ] Integration with popular API management platforms like Postman API Platform and Amazon API Gateway
 - [ ] Refactor to a better structured html templates with good coding
@@ -48,3 +47,4 @@ This document outlines the planned future development for the Odin API Gateway p
 - [x] Automated API documentation generation (OpenAPI 3.0 spec generation from service configs with auto-discovery)
 - [x] Ability to add service information based on openapi json file collection import (Import OpenAPI/Swagger specs to auto-generate service configurations)
 - [x] MongoDB integration for centralized storage (13 collections for services, config, metrics, traces, alerts, health checks, clusters, plugins, users, API keys, rate limits, cache, and audit logs with TTL indexes and automatic cleanup)
+- [x] Add AI-powered traffic analysis and anomaly detection using dockerized grok 1 open release "https://github.com/xai-org/grok-1"

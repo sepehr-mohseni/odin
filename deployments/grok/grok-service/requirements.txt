@@ -1,0 +1,14 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+aiohttp==3.9.1
+python-multipart==0.0.6
+
+# Optional: For lightweight ML
+scikit-learn==1.3.2
+numpy==1.26.2
+
+# Optional: For full Grok-1 mode (requires significant resources)
+# jax[cuda12_pip]==0.4.20
+# flax==0.7.5
+# transformers==4.35.2

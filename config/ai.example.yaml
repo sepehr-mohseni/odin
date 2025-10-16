@@ -1,0 +1,170 @@
+# AI-Powered Traffic Analysis Configuration Example
+
+# Enable AI-powered traffic analysis and anomaly detection
+ai:
+  # Enable or disable AI analysis
+  enabled: true
+  
+  # Analysis interval - how often to check for anomalies
+  # Shorter intervals = faster detection, more CPU usage
+  # Recommended: 5m for production, 1m for high-priority services
+  analysisInterval: 5m
+  
+  # Baseline calculation window - how much historical data to consider
+  # Options: 1h, 24h, 7d (hourly, daily, weekly patterns)
+  # Recommended: 24h for most use cases
+  baselineWindow: 24h
+  
+  # Anomaly detection threshold (Z-score)
+  # How many standard deviations away from baseline to trigger alert
+  # 2.0 = very sensitive, 3.0 = balanced, 4.0 = conservative, 5.0 = very conservative
+  # Recommended: 3.0 for start, tune based on false positives
+  anomalyThreshold: 3.0
+  
+  # Minimum number of data points required to establish a baseline
+  # Lower = faster baseline, but less accurate
+  # Higher = slower baseline, but more accurate
+  # Recommended: 100-500 samples
+  minSamplesForBaseline: 100
+  
+  # Use Grok model for advanced AI analysis
+  # Modes: lightweight (rule-based), full (actual Grok-1), proxy (external API)
+  # Recommended: false for production (use statistical methods)
+  # Set to true only if Grok service is deployed and stable
+  useGrokModel: false
+  
+  # Grok service URL (required if useGrokModel: true)
+  # Local deployment: http://localhost:8000
+  # Kubernetes: http://odin-grok-service:8000
+  # Docker Compose: http://odin-grok:8000
+  grokServiceUrl: "http://localhost:8000"
+  
+  # Timeout for Grok API calls
+  # Grok analysis can take time, especially with full model
+  # Lightweight mode: 5-10s
+  # Full mode: 30-60s
+  grokTimeout: 30s
+  
+  # Enable alert notifications
+  # When true, detected anomalies trigger alerts via configured channels
+  enableAlerts: true
+  
+  # Webhook URL for alert notifications
+  # Supports: Slack, PagerDuty, custom webhooks
+  # Format: POST request with JSON payload
+  # Leave empty to disable webhook alerts
+  alertWebhookUrl: "https://your-webhook-endpoint.com/alerts"
+  
+  # Data retention in days
+  # Traffic patterns and anomalies older than this are auto-deleted
+  # Recommended: 30-90 days
+  # Consider storage costs for longer retention
+  retentionDays: 90
+  
+  # Flush interval - how often to save collected data to MongoDB
+  # Shorter = more real-time, more MongoDB writes
+  # Longer = less MongoDB load, less granular data
+  # Recommended: 1m for most use cases
+  flushInterval: 1m
+  
+  # Optional tags for filtering and organization
+  tags:
+    environment: "production"
+    team: "platform"
+    region: "us-east-1"
+
+# ---
+# Additional Example Configurations:
+# Copy the relevant section above and modify as needed for your environment.
+# The following are reference examples (commented out to avoid YAML errors):
+#
+# ## Development Environment
+# ai:
+#   enabled: true
+#   analysisInterval: 1m  # Faster detection for testing
+#   baselineWindow: 1h    # Shorter baseline for quick feedback
+#   anomalyThreshold: 2.5 # More sensitive to catch issues early
+#   minSamplesForBaseline: 50
+#   useGrokModel: false
+#   enableAlerts: false   # No alerts in dev
+#   retentionDays: 7      # Keep data for a week
+#   flushInterval: 30s
+#   tags:
+#     environment: "development"
+#
+# ## Staging Environment
+# ai:
+#   enabled: true
+#   analysisInterval: 2m
+#   baselineWindow: 12h
+#   anomalyThreshold: 3.0
+#   minSamplesForBaseline: 100
+#   useGrokModel: true    # Test Grok integration
+#   grokServiceUrl: "http://odin-grok:8000"
+#   grokTimeout: 20s
+#   enableAlerts: true
+#   alertWebhookUrl: "https://hooks.slack.com/services/YOUR/STAGING/WEBHOOK"
+#   retentionDays: 30
+#   flushInterval: 1m
+#   tags:
+#     environment: "staging"
+#     team: "platform"
+#
+# ## Production Environment (High Traffic)
+# ai:
+#   enabled: true
+#   analysisInterval: 5m  # Balanced for high traffic
+#   baselineWindow: 24h   # Capture daily patterns
+#   anomalyThreshold: 3.5 # Slightly conservative to reduce noise
+#   minSamplesForBaseline: 500 # Higher for accuracy
+#   useGrokModel: false   # Use lightweight statistical methods
+#   enableAlerts: true
+#   alertWebhookUrl: "https://events.pagerduty.com/v2/enqueue"
+#   retentionDays: 90
+#   flushInterval: 2m     # Reduce MongoDB load
+#   tags:
+#     environment: "production"
+#     team: "platform"
+#     priority: "critical"
+#
+# ## Production Environment (with Grok)
+# ai:
+#   enabled: true
+#   analysisInterval: 10m # Grok is slower, less frequent analysis
+#   baselineWindow: 24h
+#   anomalyThreshold: 3.0
+#   minSamplesForBaseline: 200
+#   useGrokModel: true
+#   grokServiceUrl: "http://odin-grok-service.odin.svc.cluster.local:8000"
+#   grokTimeout: 60s      # Grok needs more time
+#   enableAlerts: true
+#   alertWebhookUrl: "https://hooks.slack.com/services/YOUR/PROD/WEBHOOK"
+#   retentionDays: 90
+#   flushInterval: 1m
+#   tags:
+#     environment: "production"
+#     team: "platform"
+#     ai_mode: "grok"
+#
+# ## Production Environment (Conservative)
+# ai:
+#   enabled: true
+#   analysisInterval: 15m # Less frequent checks
+#   baselineWindow: 7d    # Weekly patterns
+#   anomalyThreshold: 4.0 # Only critical anomalies
+#   minSamplesForBaseline: 1000 # Very stable baseline
+#   useGrokModel: false
+#   enableAlerts: true
+#   alertWebhookUrl: "https://your-webhook-endpoint.com/critical-alerts"
+#   retentionDays: 180    # Longer retention for compliance
+#   flushInterval: 5m
+#   tags:
+#     environment: "production"
+#     team: "platform"
+#     mode: "conservative"
+#
+# ## Disabled (Traditional Gateway)
+# ai:
+#   enabled: false
+#   # All other settings ignored when disabled
+#   # Gateway operates in traditional mode without AI analysis

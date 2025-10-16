@@ -26,6 +26,7 @@ type Config struct {
 	MultiCluster MultiClusterConfig `yaml:"multiCluster"`
 	OpenAPI      OpenAPIConfig      `yaml:"openapi"`
 	MongoDB      MongoDBConfig      `yaml:"mongodb"`
+	AI           AIConfig           `yaml:"ai"`
 }
 
 type ServerConfig struct {
@@ -243,6 +244,23 @@ type MongoDBTLS struct {
 	CAFile   string `yaml:"caFile"`
 	CertFile string `yaml:"certFile"`
 	KeyFile  string `yaml:"keyFile"`
+}
+
+// AIConfig represents AI-powered traffic analysis configuration
+type AIConfig struct {
+	Enabled               bool              `yaml:"enabled"`
+	AnalysisInterval      time.Duration     `yaml:"analysisInterval"`
+	BaselineWindow        time.Duration     `yaml:"baselineWindow"`
+	AnomalyThreshold      float64           `yaml:"anomalyThreshold"` // Z-score threshold
+	MinSamplesForBaseline int               `yaml:"minSamplesForBaseline"`
+	UseGrokModel          bool              `yaml:"useGrokModel"`
+	GrokServiceURL        string            `yaml:"grokServiceUrl"`
+	GrokTimeout           time.Duration     `yaml:"grokTimeout"`
+	EnableAlerts          bool              `yaml:"enableAlerts"`
+	AlertWebhookURL       string            `yaml:"alertWebhookUrl"`
+	RetentionDays         int               `yaml:"retentionDays"`
+	FlushInterval         time.Duration     `yaml:"flushInterval"` // Traffic data flush interval
+	Tags                  map[string]string `yaml:"tags"`
 }
 
 type ServiceConfig struct {
