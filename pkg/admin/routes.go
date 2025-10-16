@@ -38,6 +38,11 @@ func (h *AdminHandler) Register(e *echo.Echo) {
 	protected.POST("/services/:name", h.handleUpdateService)
 	protected.DELETE("/services/:name", h.handleDeleteService)
 
+	// Register plugin routes if plugin handler is available
+	if h.pluginHandler != nil {
+		h.pluginHandler.RegisterPluginRoutes(protected)
+	}
+
 	h.logger.Info("Admin routes registered")
 }
 

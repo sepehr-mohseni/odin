@@ -1,0 +1,291 @@
+{{define "plugin_new.html"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Plugin - Odin API Gateway Admin</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+    />
+    <style>
+      body {
+        padding-top: 20px;
+        padding-bottom: 40px;
+      }
+      .container {
+        max-width: 800px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header
+        class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom"
+      >
+        <a
+          href="/admin/dashboard"
+          class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none"
+        >
+          <span class="fs-4">Odin API Gateway Admin</span>
+        </a>
+        <ul class="nav nav-pills">
+          <li class="nav-item">
+            <a href="/admin/dashboard" class="nav-link">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/services" class="nav-link">Services</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/plugins" class="nav-link active">Plugins</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/monitoring" class="nav-link">Monitoring</a>
+          </li>
+        </ul>
+      </header>
+
+      <main>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h1>
+            <i class="bi bi-plus-circle"></i> Add New Plugin
+          </h1>
+          <a href="/admin/plugins" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Plugins
+          </a>
+        </div>
+
+        <form action="/admin/api/plugins" method="POST" id="pluginForm">
+          <div class="mb-3">
+            <label for="name" class="form-label">Plugin Name <span class="text-danger">*</span></label>
+            <input
+              type="text"
+              class="form-control"
+              id="name"
+              name="name"
+              placeholder="my-plugin"
+              required
+              pattern="[a-zA-Z0-9_-]+"
+              title="Only alphanumeric characters, hyphens, and underscores allowed"
+            />
+            <div class="form-text">Unique identifier for the plugin. Use lowercase with hyphens.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="version" class="form-label">Version <span class="text-danger">*</span></label>
+            <input
+              type="text"
+              class="form-control"
+              id="version"
+              name="version"
+              placeholder="1.0.0"
+              required
+            />
+            <div class="form-text">Semantic version (e.g., 1.0.0)</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="author" class="form-label">Author</label>
+            <input
+              type="text"
+              class="form-control"
+              id="author"
+              name="author"
+              placeholder="Your Name or Team"
+            />
+          </div>
+
+          <div class="mb-3">
+            <label for="description" class="form-label">Description</label>
+            <textarea
+              class="form-control"
+              id="description"
+              name="description"
+              rows="3"
+              placeholder="Brief description of what this plugin does"
+            ></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label for="binaryPath" class="form-label">Binary Path (.so file) <span class="text-danger">*</span></label>
+            <input
+              type="text"
+              class="form-control"
+              id="binaryPath"
+              name="binaryPath"
+              placeholder="/path/to/plugin.so"
+              required
+            />
+            <div class="form-text">Absolute path to the compiled Go plugin (.so file)</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Hooks <span class="text-danger">*</span></label>
+            <div class="form-text mb-2">Select which hooks this plugin implements:</div>
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="hook_prerequest"
+                name="hooks"
+                value="pre-request"
+              />
+              <label class="form-check-label" for="hook_prerequest">
+                <strong>pre-request</strong> - Before forwarding to backend
+              </label>
+            </div>
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="hook_postrequest"
+                name="hooks"
+                value="post-request"
+              />
+              <label class="form-check-label" for="hook_postrequest">
+                <strong>post-request</strong> - After receiving backend response
+              </label>
+            </div>
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="hook_preresponse"
+                name="hooks"
+                value="pre-response"
+              />
+              <label class="form-check-label" for="hook_preresponse">
+                <strong>pre-response</strong> - Before sending to client
+              </label>
+            </div>
+            <div class="form-check">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="hook_postresponse"
+                name="hooks"
+                value="post-response"
+              />
+              <label class="form-check-label" for="hook_postresponse">
+                <strong>post-response</strong> - After sending to client
+              </label>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label for="appliedTo" class="form-label">Applied To Routes</label>
+            <textarea
+              class="form-control"
+              id="appliedTo"
+              name="appliedTo"
+              rows="3"
+              placeholder="/api/users&#10;/api/products/*&#10;/api/v1/**"
+            ></textarea>
+            <div class="form-text">One route pattern per line. Use * for wildcards. Leave empty to apply to all routes.</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="config" class="form-label">Configuration (JSON)</label>
+            <textarea
+              class="form-control font-monospace"
+              id="config"
+              name="config"
+              rows="8"
+              placeholder='{
+  "setting1": "value1",
+  "setting2": 123,
+  "enabled": true
+}'
+            ></textarea>
+            <div class="form-text">Plugin-specific configuration in JSON format</div>
+          </div>
+
+          <div class="mb-3 form-check">
+            <input
+              type="checkbox"
+              class="form-check-input"
+              id="enabled"
+              name="enabled"
+              checked
+            />
+            <label class="form-check-label" for="enabled">
+              Enable plugin after creation
+            </label>
+          </div>
+
+          <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+            <a href="/admin/plugins" class="btn btn-secondary">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-circle"></i> Create Plugin
+            </button>
+          </div>
+        </form>
+      </main>
+
+      <footer class="pt-3 mt-5 text-muted border-top">
+        © 2025 Odin API Gateway
+      </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Handle form submission with JSON config
+      document.getElementById('pluginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = {
+          name: formData.get('name'),
+          version: formData.get('version'),
+          author: formData.get('author') || '',
+          description: formData.get('description') || '',
+          binaryPath: formData.get('binaryPath'),
+          hooks: formData.getAll('hooks'),
+          appliedTo: formData.get('appliedTo') ? formData.get('appliedTo').split('\n').filter(s => s.trim()) : [],
+          enabled: formData.has('enabled'),
+          config: {}
+        };
+        
+        // Parse config JSON if provided
+        const configText = formData.get('config');
+        if (configText && configText.trim()) {
+          try {
+            data.config = JSON.parse(configText);
+          } catch (err) {
+            alert('Invalid JSON in configuration: ' + err.message);
+            return;
+          }
+        }
+        
+        // Submit as JSON
+        fetch('/admin/api/plugins', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(err => {
+              throw new Error(err.error || 'Failed to create plugin');
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          window.location.href = '/admin/plugins';
+        })
+        .catch(error => {
+          alert('Error creating plugin: ' + error.message);
+        });
+      });
+    </script>
+  </body>
+</html>
+{{end}}

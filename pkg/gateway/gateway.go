@@ -16,6 +16,7 @@ import (
 	"odin/pkg/health"
 	"odin/pkg/logging"
 	"odin/pkg/middleware"
+	"odin/pkg/mongodb"
 	"odin/pkg/monitoring"
 	"odin/pkg/plugins"
 	"odin/pkg/routing"
@@ -41,6 +42,7 @@ type Gateway struct {
 	healthChecker   *health.TargetChecker
 	alertManager    *health.AlertManager
 	meshManager     *servicemesh.Manager
+	mongoRepo       mongodb.Repository
 }
 
 func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway, error) {
@@ -158,10 +160,70 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 
 	adminHandler := admin.New(cfg, configPath, logger)
 
+	// Initialize MongoDB repository
+	mongoConfig := &mongodb.Config{
+		Enabled:        cfg.MongoDB.Enabled,
+		URI:            cfg.MongoDB.URI,
+		Database:       cfg.MongoDB.Database,
+		ConnectTimeout: cfg.MongoDB.ConnectTimeout,
+		MaxPoolSize:    cfg.MongoDB.MaxPoolSize,
+		MinPoolSize:    cfg.MongoDB.MinPoolSize,
+		Auth: mongodb.AuthConfig{
+			Username: cfg.MongoDB.Auth.Username,
+			Password: cfg.MongoDB.Auth.Password,
+			AuthDB:   cfg.MongoDB.Auth.AuthDB,
+		},
+		TLS: mongodb.TLSConfig{
+			Enabled:  cfg.MongoDB.TLS.Enabled,
+			CertFile: cfg.MongoDB.TLS.CertFile,
+			KeyFile:  cfg.MongoDB.TLS.KeyFile,
+			CAFile:   cfg.MongoDB.TLS.CAFile,
+		},
+	}
+
+	mongoRepo, err := mongodb.NewRepository(mongoConfig, logger)
+	if err != nil {
+		logger.WithError(err).Warn("Failed to initialize MongoDB repository, plugin persistence will be disabled")
+		mongoRepo = nil
+	}
+
 	// Initialize plugin manager
 	pluginManager := plugins.NewPluginManager(logger)
 
-	// Load plugins if enabled
+	// Initialize plugin repository if MongoDB is available
+	var pluginRepo *plugins.PluginRepository
+	if mongoRepo != nil {
+		// Get MongoDB database from repository to create plugin repository
+		mongoDB := mongoRepo.GetDatabase()
+		if mongoDB != nil {
+			pluginRepo = plugins.NewPluginRepository(mongoDB)
+			logger.Info("Plugin repository initialized with MongoDB")
+
+			// Load enabled plugins from MongoDB
+			ctx := context.Background()
+			enabledPlugins, err := pluginRepo.GetEnabledPlugins(ctx)
+			if err != nil {
+				logger.WithError(err).Warn("Failed to load enabled plugins from MongoDB")
+			} else {
+				logger.Infof("Loading %d enabled plugins from database", len(enabledPlugins))
+				for _, plugin := range enabledPlugins {
+					if err := pluginManager.LoadPlugin(plugin.Name, plugin.BinaryPath, plugin.Config, plugin.Hooks); err != nil {
+						logger.WithError(err).Warnf("Failed to load plugin %s from database", plugin.Name)
+					} else {
+						logger.Infof("Loaded plugin %s from database", plugin.Name)
+					}
+				}
+			}
+		}
+	}
+
+	// Set plugin handler in admin if both manager and repository are available
+	if pluginManager != nil && pluginRepo != nil {
+		adminHandler.SetPluginHandler(pluginManager, pluginRepo)
+		logger.Info("Plugin admin panel initialized")
+	}
+
+	// Load plugins from config if enabled (for backward compatibility)
 	if cfg.Plugins.Enabled {
 		for _, pluginCfg := range cfg.Plugins.Plugins {
 			if pluginCfg.Enabled {
@@ -260,6 +322,7 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 		healthChecker:   healthChecker,
 		alertManager:    alertManager,
 		meshManager:     meshManager,
+		mongoRepo:       mongoRepo,
 	}
 
 	// Setup protocol-specific proxies

@@ -1,0 +1,446 @@
+{{define "plugin_detail.html"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{.Plugin.Name}} - Odin API Gateway Admin</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
+    />
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    <style>
+      body {
+        padding-top: 20px;
+        padding-bottom: 40px;
+      }
+      .container {
+        max-width: 900px;
+      }
+      .info-label {
+        font-weight: 600;
+        color: #6c757d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header
+        class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom"
+      >
+        <a
+          href="/admin/dashboard"
+          class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none"
+        >
+          <span class="fs-4">Odin API Gateway Admin</span>
+        </a>
+        <ul class="nav nav-pills">
+          <li class="nav-item">
+            <a href="/admin/dashboard" class="nav-link">Dashboard</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/services" class="nav-link">Services</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/plugins" class="nav-link active">Plugins</a>
+          </li>
+          <li class="nav-item">
+            <a href="/admin/monitoring" class="nav-link">Monitoring</a>
+          </li>
+        </ul>
+      </header>
+
+      <main>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h1>
+            <i class="bi bi-plugin"></i> {{.Plugin.Name}}
+          </h1>
+          <a href="/admin/plugins" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Plugins
+          </a>
+        </div>
+
+        <!-- Status and Actions -->
+        <div class="card mb-4">
+          <div class="card-body">
+            <div class="row align-items-center">
+              <div class="col-md-6">
+                <h5 class="card-title mb-3">Status</h5>
+                <div class="mb-2">
+                  {{.Plugin.EnabledBadge}}
+                  {{.Plugin.LoadedBadge}}
+                </div>
+              </div>
+              <div class="col-md-6 text-md-end">
+                <div class="btn-group" role="group">
+                  {{if .Plugin.Enabled}}
+                  <button
+                    hx-post="/admin/api/plugins/{{.Plugin.Name}}/disable"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()"
+                    class="btn btn-warning"
+                  >
+                    <i class="bi bi-pause-circle"></i> Disable
+                  </button>
+                  {{else}}
+                  <button
+                    hx-post="/admin/api/plugins/{{.Plugin.Name}}/enable"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()"
+                    class="btn btn-success"
+                  >
+                    <i class="bi bi-play-circle"></i> Enable
+                  </button>
+                  {{end}}
+                  
+                  {{if .Plugin.Loaded}}
+                  <button
+                    hx-post="/admin/api/plugins/{{.Plugin.Name}}/unload"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()"
+                    class="btn btn-info"
+                  >
+                    <i class="bi bi-box-arrow-right"></i> Unload
+                  </button>
+                  {{else}}
+                  <button
+                    hx-post="/admin/api/plugins/{{.Plugin.Name}}/load"
+                    hx-swap="none"
+                    hx-on::after-request="location.reload()"
+                    class="btn btn-info"
+                  >
+                    <i class="bi bi-box-arrow-in-right"></i> Load
+                  </button>
+                  {{end}}
+                  
+                  <button
+                    type="button"
+                    class="btn btn-primary"
+                    onclick="toggleEditMode()"
+                    id="editBtn"
+                  >
+                    <i class="bi bi-pencil"></i> Edit
+                  </button>
+                  
+                  <button
+                    hx-delete="/admin/api/plugins/{{.Plugin.Name}}"
+                    hx-confirm="Are you sure you want to delete this plugin? This action cannot be undone."
+                    hx-swap="none"
+                    hx-on::after-request="window.location.href='/admin/plugins'"
+                    class="btn btn-danger"
+                  >
+                    <i class="bi bi-trash"></i> Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plugin Information -->
+        <div id="viewMode">
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Plugin Information</h5>
+              
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Version:</div>
+                <div class="col-md-9">
+                  <span class="badge bg-info">{{.Plugin.Version}}</span>
+                </div>
+              </div>
+              
+              {{if .Plugin.Author}}
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Author:</div>
+                <div class="col-md-9">{{.Plugin.Author}}</div>
+              </div>
+              {{end}}
+              
+              {{if .Plugin.Description}}
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Description:</div>
+                <div class="col-md-9">{{.Plugin.Description}}</div>
+              </div>
+              {{end}}
+              
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Binary Path:</div>
+                <div class="col-md-9">
+                  <code>{{.Plugin.BinaryPath}}</code>
+                </div>
+              </div>
+              
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Hooks:</div>
+                <div class="col-md-9">
+                  {{range .Plugin.Hooks}}
+                  <span class="badge bg-secondary me-1">{{.}}</span>
+                  {{end}}
+                </div>
+              </div>
+              
+              {{if .Plugin.AppliedTo}}
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Applied To:</div>
+                <div class="col-md-9">
+                  {{range .Plugin.AppliedTo}}
+                  <div><code>{{.}}</code></div>
+                  {{end}}
+                </div>
+              </div>
+              {{else}}
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Applied To:</div>
+                <div class="col-md-9">
+                  <span class="text-muted">All routes</span>
+                </div>
+              </div>
+              {{end}}
+              
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Created:</div>
+                <div class="col-md-9">{{.Plugin.CreatedAt}}</div>
+              </div>
+              
+              <div class="row mb-3">
+                <div class="col-md-3 info-label">Updated:</div>
+                <div class="col-md-9">{{.Plugin.UpdatedAt}}</div>
+              </div>
+            </div>
+          </div>
+
+          {{if .Plugin.Config}}
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title mb-3">Configuration</h5>
+              <pre class="bg-light p-3 rounded"><code>{{.Plugin.ConfigJSON}}</code></pre>
+            </div>
+          </div>
+          {{end}}
+        </div>
+
+        <!-- Edit Form (hidden by default) -->
+        <div id="editMode" style="display: none;">
+          <form id="editForm">
+            <div class="card mb-4">
+              <div class="card-body">
+                <h5 class="card-title mb-3">Edit Plugin</h5>
+                
+                <div class="mb-3">
+                  <label for="edit_version" class="form-label">Version</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="edit_version"
+                    name="version"
+                    value="{{.Plugin.Version}}"
+                    required
+                  />
+                </div>
+                
+                <div class="mb-3">
+                  <label for="edit_author" class="form-label">Author</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="edit_author"
+                    name="author"
+                    value="{{.Plugin.Author}}"
+                  />
+                </div>
+                
+                <div class="mb-3">
+                  <label for="edit_description" class="form-label">Description</label>
+                  <textarea
+                    class="form-control"
+                    id="edit_description"
+                    name="description"
+                    rows="3"
+                  >{{.Plugin.Description}}</textarea>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="edit_binaryPath" class="form-label">Binary Path</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="edit_binaryPath"
+                    name="binaryPath"
+                    value="{{.Plugin.BinaryPath}}"
+                    required
+                  />
+                </div>
+                
+                <div class="mb-3">
+                  <label class="form-label">Hooks</label>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="edit_hook_prerequest"
+                      name="hooks"
+                      value="pre-request"
+                      {{if hasHook .Plugin.Hooks "pre-request"}}checked{{end}}
+                    />
+                    <label class="form-check-label" for="edit_hook_prerequest">
+                      pre-request
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="edit_hook_postrequest"
+                      name="hooks"
+                      value="post-request"
+                      {{if hasHook .Plugin.Hooks "post-request"}}checked{{end}}
+                    />
+                    <label class="form-check-label" for="edit_hook_postrequest">
+                      post-request
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="edit_hook_preresponse"
+                      name="hooks"
+                      value="pre-response"
+                      {{if hasHook .Plugin.Hooks "pre-response"}}checked{{end}}
+                    />
+                    <label class="form-check-label" for="edit_hook_preresponse">
+                      pre-response
+                    </label>
+                  </div>
+                  <div class="form-check">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      id="edit_hook_postresponse"
+                      name="hooks"
+                      value="post-response"
+                      {{if hasHook .Plugin.Hooks "post-response"}}checked{{end}}
+                    />
+                    <label class="form-check-label" for="edit_hook_postresponse">
+                      post-response
+                    </label>
+                  </div>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="edit_appliedTo" class="form-label">Applied To Routes</label>
+                  <textarea
+                    class="form-control"
+                    id="edit_appliedTo"
+                    name="appliedTo"
+                    rows="3"
+                  >{{range .Plugin.AppliedTo}}{{.}}&#10;{{end}}</textarea>
+                  <div class="form-text">One route per line</div>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="edit_config" class="form-label">Configuration (JSON)</label>
+                  <textarea
+                    class="form-control font-monospace"
+                    id="edit_config"
+                    name="config"
+                    rows="8"
+                  >{{.Plugin.ConfigJSON}}</textarea>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                  <button type="button" class="btn btn-secondary" onclick="toggleEditMode()">
+                    Cancel
+                  </button>
+                  <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Save Changes
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+      </main>
+
+      <footer class="pt-3 mt-4 text-muted border-top">
+        © 2025 Odin API Gateway
+      </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      function toggleEditMode() {
+        const viewMode = document.getElementById('viewMode');
+        const editMode = document.getElementById('editMode');
+        const editBtn = document.getElementById('editBtn');
+        
+        if (viewMode.style.display === 'none') {
+          viewMode.style.display = 'block';
+          editMode.style.display = 'none';
+          editBtn.innerHTML = '<i class="bi bi-pencil"></i> Edit';
+        } else {
+          viewMode.style.display = 'none';
+          editMode.style.display = 'block';
+          editBtn.innerHTML = '<i class="bi bi-eye"></i> View';
+        }
+      }
+      
+      // Handle edit form submission
+      document.getElementById('editForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = {
+          version: formData.get('version'),
+          author: formData.get('author') || '',
+          description: formData.get('description') || '',
+          binaryPath: formData.get('binaryPath'),
+          hooks: formData.getAll('hooks'),
+          appliedTo: formData.get('appliedTo') ? formData.get('appliedTo').split('\n').filter(s => s.trim()) : [],
+          config: {}
+        };
+        
+        // Parse config JSON
+        const configText = formData.get('config');
+        if (configText && configText.trim()) {
+          try {
+            data.config = JSON.parse(configText);
+          } catch (err) {
+            alert('Invalid JSON in configuration: ' + err.message);
+            return;
+          }
+        }
+        
+        // Submit as JSON
+        fetch('/admin/api/plugins/{{.Plugin.Name}}', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(data)
+        })
+        .then(response => {
+          if (!response.ok) {
+            return response.json().then(err => {
+              throw new Error(err.error || 'Failed to update plugin');
+            });
+          }
+          return response.json();
+        })
+        .then(data => {
+          location.reload();
+        })
+        .catch(error => {
+          alert('Error updating plugin: ' + error.message);
+        });
+      });
+    </script>
+  </body>
+</html>
+{{end}}

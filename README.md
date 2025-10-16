@@ -262,12 +262,21 @@ make docker-compose
 
 ## 📖 Documentation
 
+### User Documentation
 - [📋 Configuration Guide](docs/configuration.md) - Complete configuration reference
 - [🔌 API Reference](docs/api.md) - REST API documentation
 - [🚀 Deployment Guide](docs/deployment.md) - Production deployment strategies
 - [🔧 Plugin Development](docs/plugins.md) - Extending gateway functionality
 - [📊 Monitoring Setup](docs/monitoring.md) - Observability and alerting
 - [🔒 Security Guide](docs/security.md) - Security best practices
+- [🧠 AI Traffic Analysis](docs/ai-analysis.md) - AI-powered anomaly detection
+
+### Project Planning
+- [🗺️ Roadmap](ROADMAP.md) - Current and planned features
+- [📋 Implementation Plan](docs/IMPLEMENTATION_PLAN.md) - Detailed 7-month plan (50+ pages)
+- [✅ Implementation Checklist](docs/IMPLEMENTATION_CHECKLIST.md) - Progress tracking
+- [📊 Visual Roadmap](docs/VISUAL_ROADMAP.md) - Timeline and milestones
+- [📄 Executive Summary](docs/EXECUTIVE_SUMMARY.md) - High-level overview for stakeholders
 
 ## 🤝 Contributing
 

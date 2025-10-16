@@ -2,6 +2,7 @@ package admin
 
 import (
 	"odin/pkg/config"
+	"odin/pkg/plugins"
 	"os"
 	"path/filepath"
 
@@ -15,12 +16,13 @@ type AdminCredentials struct {
 }
 
 type AdminHandler struct {
-	config     *config.Config
-	configPath string
-	logger     *logrus.Logger
-	username   string
-	password   string
-	enabled    bool
+	config        *config.Config
+	configPath    string
+	logger        *logrus.Logger
+	username      string
+	password      string
+	enabled       bool
+	pluginHandler *PluginHandler
 }
 
 func loadAdminCredentials(logger *logrus.Logger) (*AdminCredentials, error) {
@@ -85,13 +87,19 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) *AdminHan
 	}
 
 	return &AdminHandler{
-		config:     cfg,
-		configPath: configPath,
-		logger:     logger,
-		username:   username,
-		password:   password,
-		enabled:    cfg.Admin.Enabled,
+		config:        cfg,
+		configPath:    configPath,
+		logger:        logger,
+		username:      username,
+		password:      password,
+		enabled:       cfg.Admin.Enabled,
+		pluginHandler: nil, // Will be set later via SetPluginHandler
 	}
+}
+
+// SetPluginHandler sets the plugin handler for admin
+func (h *AdminHandler) SetPluginHandler(pluginManager *plugins.PluginManager, pluginRepo *plugins.PluginRepository) {
+	h.pluginHandler = NewPluginHandler(pluginManager, pluginRepo)
 }
 
 func (h *AdminHandler) saveConfig() error {

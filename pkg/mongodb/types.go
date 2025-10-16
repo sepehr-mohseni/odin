@@ -3,6 +3,8 @@ package mongodb
 import (
 	"context"
 	"time"
+
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Config defines MongoDB configuration
@@ -246,6 +248,9 @@ type AuditLogDocument struct {
 
 // Repository defines the interface for MongoDB operations
 type Repository interface {
+	// Database access
+	GetDatabase() *mongo.Database
+
 	// Service operations
 	CreateService(ctx context.Context, service *ServiceDocument) error
 	GetService(ctx context.Context, id string) (*ServiceDocument, error)

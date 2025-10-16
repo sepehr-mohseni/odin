@@ -56,7 +56,16 @@ func (h *AdminHandler) renderTemplate(c echo.Context, templateName string, data 
 
 	// Parse all template files together to support includes
 	pattern := filepath.Join(templateDir, "*.html")
-	tmpl, err := template.ParseGlob(pattern)
+	tmpl, err := template.New("").Funcs(template.FuncMap{
+		"hasHook": func(hooks []string, hook string) bool {
+			for _, h := range hooks {
+				if h == hook {
+					return true
+				}
+			}
+			return false
+		},
+	}).ParseGlob(pattern)
 	if err != nil {
 		h.logger.WithError(err).Errorf("Failed to parse templates")
 

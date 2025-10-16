@@ -544,6 +544,11 @@ func (r *repository) Close(ctx context.Context) error {
 	return r.client.Disconnect(ctx)
 }
 
+// GetDatabase returns the MongoDB database instance
+func (r *repository) GetDatabase() *mongo.Database {
+	return r.database
+}
+
 // maskURI masks sensitive information in MongoDB URI
 func maskURI(uri string) string {
 	// Simple masking - in production, use proper URL parsing
@@ -553,6 +558,9 @@ func maskURI(uri string) string {
 // noopRepository is a no-op implementation when MongoDB is disabled
 type noopRepository struct{}
 
+func (n *noopRepository) GetDatabase() *mongo.Database {
+	return nil
+}
 func (n *noopRepository) CreateService(ctx context.Context, service *ServiceDocument) error {
 	return nil
 }
