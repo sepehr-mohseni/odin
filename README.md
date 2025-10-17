@@ -6,7 +6,7 @@
 [![codecov](https://codecov.io/gh/sepehr-mohseni/odin/branch/main/graph/badge.svg)](https://codecov.io/gh/sepehr-mohseni/odin)
 [![Go Report Card](https://goreportcard.com/badge/github.com/sepehr-mohseni/odin)](https://goreportcard.com/report/github.com/sepehr-mohseni/odin)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![GitHub stars](https://img.shields.io/github/stars/sepehr-mohseni/odin?style=social)](https://github.com/sepehr-mohseni/odin/stargazers)
 
 _A lightning-fast, feature-rich API Gateway built with Go_
@@ -37,7 +37,7 @@ _A lightning-fast, feature-rich API Gateway built with Go_
 </td>
 <td width="50%">
 
-### 📊 **Advanced Features**
+### Advanced Features**
 
 - **🔗 Response Aggregation** - Combine multiple service responses
 - **⚙️ Admin Interface** - Web-based configuration management
@@ -46,6 +46,7 @@ _A lightning-fast, feature-rich API Gateway built with Go_
 - **🏗️ Service Discovery** - Dynamic service registration
 - **📝 API Documentation** - Auto-generated OpenAPI specs
 - **🧩 Plugin System** - Extensible architecture with custom plugins
+- **📦 Plugin Upload** - Upload and manage Go plugins via admin panel
 - **📊 GraphQL Proxy** - Query validation, caching, and security
 - **⚡ gRPC Support** - HTTP-to-gRPC transcoding
 - **🗄️ MongoDB Integration** - Centralized storage for config and metrics
@@ -60,7 +61,7 @@ _A lightning-fast, feature-rich API Gateway built with Go_
 
 ### Prerequisites
 
-- Go 1.21 or higher
+- Go 1.25 or higher
 - Redis (optional, for distributed rate limiting and caching)
 - MongoDB (optional, for persistent storage and metrics)
 
@@ -266,10 +267,16 @@ make docker-compose
 - [📋 Configuration Guide](docs/configuration.md) - Complete configuration reference
 - [🔌 API Reference](docs/api.md) - REST API documentation
 - [🚀 Deployment Guide](docs/deployment.md) - Production deployment strategies
-- [🔧 Plugin Development](docs/plugins.md) - Extending gateway functionality
+- [🧩 Plugin Development Guide](docs/plugin-development-guide.md) - Complete guide to building and deploying plugins
+- [📦 Plugin Upload User Guide](docs/GOAL-7-USER-GUIDE.md) - **Upload and manage plugins via admin panel**
 - [📊 Monitoring Setup](docs/monitoring.md) - Observability and alerting
 - [🔒 Security Guide](docs/security.md) - Security best practices
 - [🧠 AI Traffic Analysis](docs/ai-analysis.md) - AI-powered anomaly detection
+
+### Technical Documentation
+- [🗺️ Goal #7 Summary](docs/GOAL-7-SUMMARY.md) - **Plugin upload system implementation** (3,200+ lines, 90% complete)
+- [📋 Goal #7 Plan](docs/GOAL-7-PLAN.md) - Plugin upload architecture and design
+- [🧪 Test Results](test/unit/pkg/plugins/) - 30 comprehensive tests, 100% pass rate
 
 ### Project Planning
 - [🗺️ Roadmap](ROADMAP.md) - Current and planned features

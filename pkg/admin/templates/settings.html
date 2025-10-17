@@ -1,0 +1,734 @@
+{{define "settings.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Gateway Settings - Odin Admin{{end}}
+
+{{define "content"}}
+<div class="row mb-4">
+  <div class="col">
+    <h2><i class="bi bi-gear"></i> Gateway Settings</h2>
+    <p class="text-muted">Configure and manage gateway settings</p>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" id="exportBtn">
+      <i class="bi bi-download"></i> Export Config
+    </button>
+    <button class="btn btn-outline-primary" id="reloadBtn">
+      <i class="bi bi-arrow-clockwise"></i> Reload Config
+    </button>
+  </div>
+</div>
+
+<!-- Gateway Info Card -->
+<div class="row mb-4">
+  <div class="col-md-12">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Gateway Information</h5>
+        <div class="row" id="gatewayInfo">
+          <div class="col-md-3">
+            <div class="mb-2">
+              <small class="text-muted">Config Path</small>
+              <div id="configPath">-</div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="mb-2">
+              <small class="text-muted">Last Modified</small>
+              <div id="configModified">-</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="mb-2">
+              <small class="text-muted">Services</small>
+              <div id="servicesCount">-</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="mb-2">
+              <small class="text-muted">Plugins</small>
+              <div id="pluginsCount">-</div>
+            </div>
+          </div>
+          <div class="col-md-2">
+            <div class="mb-2">
+              <small class="text-muted">Active Requests</small>
+              <div id="activeRequests">-</div>
+            </div>
+          </div>
+        </div>
+        <div class="row mt-3">
+          <div class="col-md-12">
+            <small class="text-muted d-block mb-2">Enabled Features</small>
+            <div id="enabledFeatures"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Tabs -->
+<ul class="nav nav-tabs" id="settingsTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="server-tab" data-bs-toggle="tab" data-bs-target="#server" type="button">
+      Server
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="logging-tab" data-bs-toggle="tab" data-bs-target="#logging" type="button">
+      Logging
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="ratelimit-tab" data-bs-toggle="tab" data-bs-target="#ratelimit" type="button">
+      Rate Limiting
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="cache-tab" data-bs-toggle="tab" data-bs-target="#cache" type="button">
+      Cache
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="monitoring-tab" data-bs-toggle="tab" data-bs-target="#monitoring" type="button">
+      Monitoring
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tracing-tab" data-bs-toggle="tab" data-bs-target="#tracing" type="button">
+      Tracing
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="settingsTabContent">
+  <!-- Server Settings -->
+  <div class="tab-pane fade show active" id="server" role="tabpanel">
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Server Configuration</h5>
+        <form id="serverForm">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="serverPort" class="form-label">Port</label>
+                <input type="number" class="form-control" id="serverPort" min="1" max="65535" required>
+                <div class="form-text">Gateway server port (1-65535)</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="serverCompression" class="form-label">Response Compression</label>
+                <select class="form-select" id="serverCompression">
+                  <option value="true">Enabled</option>
+                  <option value="false">Disabled</option>
+                </select>
+                <div class="form-text">Enable gzip compression for responses</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="serverTimeout" class="form-label">Timeout</label>
+                <input type="text" class="form-control" id="serverTimeout" placeholder="30s" required>
+                <div class="form-text">Request timeout duration (e.g., 30s, 1m)</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="serverReadTimeout" class="form-label">Read Timeout</label>
+                <input type="text" class="form-control" id="serverReadTimeout" placeholder="30s" required>
+                <div class="form-text">Maximum duration for reading request</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="serverWriteTimeout" class="form-label">Write Timeout</label>
+                <input type="text" class="form-control" id="serverWriteTimeout" placeholder="30s" required>
+                <div class="form-text">Maximum duration for writing response</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="serverGracefulTimeout" class="form-label">Graceful Shutdown Timeout</label>
+                <input type="text" class="form-control" id="serverGracefulTimeout" placeholder="15s" required>
+                <div class="form-text">Time to wait for connections to close</div>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> <strong>Note:</strong> Server settings changes require a gateway restart to take effect.
+          </div>
+          <button type="submit" class="btn btn-primary">Save Server Settings</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Logging Settings -->
+  <div class="tab-pane fade" id="logging" role="tabpanel">
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Logging Configuration</h5>
+        <form id="loggingForm">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="loggingLevel" class="form-label">Log Level</label>
+                <select class="form-select" id="loggingLevel" required>
+                  <option value="debug">Debug</option>
+                  <option value="info">Info</option>
+                  <option value="warn">Warning</option>
+                  <option value="error">Error</option>
+                </select>
+                <div class="form-text">Minimum log level to output</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="loggingJSON" class="form-label">JSON Format</label>
+                <select class="form-select" id="loggingJSON">
+                  <option value="false">Disabled (Human-readable)</option>
+                  <option value="true">Enabled (JSON)</option>
+                </select>
+                <div class="form-text">Output logs in JSON format</div>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Logging Settings</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rate Limiting Settings -->
+  <div class="tab-pane fade" id="ratelimit" role="tabpanel">
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Rate Limiting Configuration</h5>
+        <form id="rateLimitForm">
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="rateLimitEnabled">
+                <label class="form-check-label" for="rateLimitEnabled">
+                  Enable Rate Limiting
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="rateLimitLimit" class="form-label">Request Limit</label>
+                <input type="number" class="form-control" id="rateLimitLimit" min="1" required>
+                <div class="form-text">Maximum requests per window</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="rateLimitDuration" class="form-label">Window Duration</label>
+                <input type="text" class="form-control" id="rateLimitDuration" placeholder="1m" required>
+                <div class="form-text">Time window (e.g., 1m, 1h)</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="rateLimitStrategy" class="form-label">Strategy</label>
+                <input type="text" class="form-control" id="rateLimitStrategy" placeholder="local">
+                <div class="form-text">local or redis</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3">
+                <label for="rateLimitRedisURL" class="form-label">Redis URL (optional)</label>
+                <input type="text" class="form-control" id="rateLimitRedisURL" placeholder="redis://localhost:6379">
+                <div class="form-text">Redis connection URL for distributed rate limiting</div>
+              </div>
+            </div>
+          </div>
+          <div class="alert alert-info">
+            <i class="bi bi-info-circle"></i> Rate limiting helps protect your services from abuse and ensures fair resource allocation.
+          </div>
+          <button type="submit" class="btn btn-primary">Save Rate Limit Settings</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cache Settings -->
+  <div class="tab-pane fade" id="cache" role="tabpanel">
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Cache Configuration</h5>
+        <form id="cacheForm">
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="cacheEnabled">
+                <label class="form-check-label" for="cacheEnabled">
+                  Enable Response Caching
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="cacheTTL" class="form-label">Cache TTL</label>
+                <input type="text" class="form-control" id="cacheTTL" placeholder="5m" required>
+                <div class="form-text">Time to live (e.g., 5m, 1h)</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="cacheStrategy" class="form-label">Strategy</label>
+                <select class="form-select" id="cacheStrategy" required>
+                  <option value="local">Local (In-Memory)</option>
+                  <option value="redis">Redis</option>
+                </select>
+                <div class="form-text">Cache storage backend</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="cacheMaxSizeInMB" class="form-label">Max Size (MB)</label>
+                <input type="number" class="form-control" id="cacheMaxSizeInMB" min="1" placeholder="100">
+                <div class="form-text">For local strategy only</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3">
+                <label for="cacheRedisURL" class="form-label">Redis URL (optional)</label>
+                <input type="text" class="form-control" id="cacheRedisURL" placeholder="redis://localhost:6379">
+                <div class="form-text">Redis connection URL for distributed caching</div>
+              </div>
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">Save Cache Settings</button>
+            <button type="button" class="btn btn-outline-danger" id="clearCacheBtn">Clear Cache</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Monitoring Settings -->
+  <div class="tab-pane fade" id="monitoring" role="tabpanel">
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Monitoring Configuration</h5>
+        <form id="monitoringForm">
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="monitoringEnabled">
+                <label class="form-check-label" for="monitoringEnabled">
+                  Enable Prometheus Metrics
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="monitoringPath" class="form-label">Metrics Path</label>
+                <input type="text" class="form-control" id="monitoringPath" placeholder="/metrics" required>
+                <div class="form-text">HTTP endpoint for metrics</div>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="monitoringWebhookURL" class="form-label">Webhook URL (optional)</label>
+                <input type="text" class="form-control" id="monitoringWebhookURL" placeholder="https://example.com/alerts">
+                <div class="form-text">For health check alerts</div>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Monitoring Settings</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tracing Settings -->
+  <div class="tab-pane fade" id="tracing" role="tabpanel">
+    <div class="card mt-3">
+      <div class="card-body">
+        <h5 class="card-title">Distributed Tracing Configuration</h5>
+        <form id="tracingForm">
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="tracingEnabled">
+                <label class="form-check-label" for="tracingEnabled">
+                  Enable OpenTelemetry Tracing
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="tracingServiceName" class="form-label">Service Name</label>
+                <input type="text" class="form-control" id="tracingServiceName" placeholder="odin-gateway" required>
+                <div class="form-text">Service identifier in traces</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="tracingServiceVersion" class="form-label">Version</label>
+                <input type="text" class="form-control" id="tracingServiceVersion" placeholder="1.0.0" required>
+                <div class="form-text">Service version</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="tracingEnvironment" class="form-label">Environment</label>
+                <input type="text" class="form-control" id="tracingEnvironment" placeholder="production" required>
+                <div class="form-text">Deployment environment</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-8">
+              <div class="mb-3">
+                <label for="tracingEndpoint" class="form-label">OTLP Endpoint</label>
+                <input type="text" class="form-control" id="tracingEndpoint" placeholder="http://localhost:4318/v1/traces" required>
+                <div class="form-text">OpenTelemetry collector endpoint</div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="mb-3">
+                <label for="tracingSampleRate" class="form-label">Sample Rate</label>
+                <input type="number" class="form-control" id="tracingSampleRate" min="0" max="1" step="0.1" placeholder="1.0" required>
+                <div class="form-text">0.0 - 1.0 (0% - 100%)</div>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12">
+              <div class="mb-3 form-check">
+                <input type="checkbox" class="form-check-input" id="tracingInsecure">
+                <label class="form-check-label" for="tracingInsecure">
+                  Allow Insecure Connections
+                </label>
+              </div>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save Tracing Settings</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "scripts"}}
+<script>
+  // Load gateway info and settings
+  async function loadGatewayInfo() {
+    try {
+      const [info, stats] = await Promise.all([
+        OdinAPI.get('/admin/api/settings/info'),
+        OdinAPI.get('/admin/api/settings/stats')
+      ]);
+
+      document.getElementById('configPath').textContent = info.configPath;
+      document.getElementById('configModified').textContent = info.configModified ? formatDate(info.configModified, 'datetime') : 'N/A';
+      document.getElementById('servicesCount').textContent = info.servicesCount;
+      document.getElementById('pluginsCount').textContent = info.pluginsCount;
+      document.getElementById('activeRequests').textContent = stats.requests || 0;
+
+      // Display enabled features
+      const featuresDiv = document.getElementById('enabledFeatures');
+      featuresDiv.innerHTML = '';
+      Object.entries(info.features).forEach(([feature, enabled]) => {
+        if (enabled) {
+          const badge = document.createElement('span');
+          badge.className = 'badge bg-success me-2';
+          badge.textContent = feature;
+          featuresDiv.appendChild(badge);
+        }
+      });
+    } catch (error) {
+      showToast('Failed to load gateway info: ' + error.message, 'danger');
+    }
+  }
+
+  // Load server settings
+  async function loadServerSettings() {
+    try {
+      const response = await OdinAPI.get('/admin/api/settings/server');
+      const server = response.server;
+      
+      document.getElementById('serverPort').value = server.port;
+      document.getElementById('serverTimeout').value = server.timeout;
+      document.getElementById('serverReadTimeout').value = server.readTimeout;
+      document.getElementById('serverWriteTimeout').value = server.writeTimeout;
+      document.getElementById('serverGracefulTimeout').value = server.gracefulTimeout;
+      document.getElementById('serverCompression').value = server.compression.toString();
+    } catch (error) {
+      showToast('Failed to load server settings', 'danger');
+    }
+  }
+
+  // Load logging settings
+  async function loadLoggingSettings() {
+    try {
+      const response = await OdinAPI.get('/admin/api/settings/logging');
+      const logging = response.logging;
+      
+      document.getElementById('loggingLevel').value = logging.level;
+      document.getElementById('loggingJSON').value = logging.json.toString();
+    } catch (error) {
+      showToast('Failed to load logging settings', 'danger');
+    }
+  }
+
+  // Load rate limit settings
+  async function loadRateLimitSettings() {
+    try {
+      const response = await OdinAPI.get('/admin/api/settings/ratelimit');
+      const rateLimit = response.rateLimit;
+      
+      document.getElementById('rateLimitEnabled').checked = rateLimit.enabled;
+      document.getElementById('rateLimitLimit').value = rateLimit.limit;
+      document.getElementById('rateLimitDuration').value = rateLimit.duration;
+      document.getElementById('rateLimitStrategy').value = rateLimit.strategy;
+      document.getElementById('rateLimitRedisURL').value = rateLimit.redisUrl || '';
+    } catch (error) {
+      showToast('Failed to load rate limit settings', 'danger');
+    }
+  }
+
+  // Load cache settings
+  async function loadCacheSettings() {
+    try {
+      const response = await OdinAPI.get('/admin/api/settings/cache');
+      const cache = response.cache;
+      
+      document.getElementById('cacheEnabled').checked = cache.enabled;
+      document.getElementById('cacheTTL').value = cache.ttl;
+      document.getElementById('cacheStrategy').value = cache.strategy;
+      document.getElementById('cacheMaxSizeInMB').value = cache.maxSizeInMB || 100;
+      document.getElementById('cacheRedisURL').value = cache.redisUrl || '';
+    } catch (error) {
+      showToast('Failed to load cache settings', 'danger');
+    }
+  }
+
+  // Load monitoring settings
+  async function loadMonitoringSettings() {
+    try {
+      const response = await OdinAPI.get('/admin/api/settings/monitoring');
+      const monitoring = response.monitoring;
+      
+      document.getElementById('monitoringEnabled').checked = monitoring.enabled;
+      document.getElementById('monitoringPath').value = monitoring.path;
+      document.getElementById('monitoringWebhookURL').value = monitoring.webhookUrl || '';
+    } catch (error) {
+      showToast('Failed to load monitoring settings', 'danger');
+    }
+  }
+
+  // Load tracing settings
+  async function loadTracingSettings() {
+    try {
+      const response = await OdinAPI.get('/admin/api/settings/tracing');
+      const tracing = response.tracing;
+      
+      document.getElementById('tracingEnabled').checked = tracing.enabled;
+      document.getElementById('tracingServiceName').value = tracing.serviceName;
+      document.getElementById('tracingServiceVersion').value = tracing.serviceVersion;
+      document.getElementById('tracingEnvironment').value = tracing.environment;
+      document.getElementById('tracingEndpoint').value = tracing.endpoint;
+      document.getElementById('tracingSampleRate').value = tracing.sampleRate;
+      document.getElementById('tracingInsecure').checked = tracing.insecure;
+    } catch (error) {
+      showToast('Failed to load tracing settings', 'danger');
+    }
+  }
+
+  // Form submissions
+  document.getElementById('serverForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      port: parseInt(document.getElementById('serverPort').value),
+      timeout: document.getElementById('serverTimeout').value,
+      readTimeout: document.getElementById('serverReadTimeout').value,
+      writeTimeout: document.getElementById('serverWriteTimeout').value,
+      gracefulTimeout: document.getElementById('serverGracefulTimeout').value,
+      compression: document.getElementById('serverCompression').value === 'true'
+    };
+
+    try {
+      await OdinAPI.put('/admin/api/settings/server', data);
+      showToast('Server settings saved successfully. Restart required.', 'success');
+      loadGatewayInfo();
+    } catch (error) {
+      showToast('Failed to save server settings: ' + error.message, 'danger');
+    }
+  });
+
+  document.getElementById('loggingForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      level: document.getElementById('loggingLevel').value,
+      json: document.getElementById('loggingJSON').value === 'true'
+    };
+
+    try {
+      await OdinAPI.put('/admin/api/settings/logging', data);
+      showToast('Logging settings saved successfully', 'success');
+    } catch (error) {
+      showToast('Failed to save logging settings: ' + error.message, 'danger');
+    }
+  });
+
+  document.getElementById('rateLimitForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      enabled: document.getElementById('rateLimitEnabled').checked,
+      limit: parseInt(document.getElementById('rateLimitLimit').value),
+      duration: document.getElementById('rateLimitDuration').value,
+      strategy: document.getElementById('rateLimitStrategy').value,
+      redisUrl: document.getElementById('rateLimitRedisURL').value
+    };
+
+    try {
+      await OdinAPI.put('/admin/api/settings/ratelimit', data);
+      showToast('Rate limit settings saved successfully. Restart required.', 'success');
+      loadGatewayInfo();
+    } catch (error) {
+      showToast('Failed to save rate limit settings: ' + error.message, 'danger');
+    }
+  });
+
+  document.getElementById('cacheForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      enabled: document.getElementById('cacheEnabled').checked,
+      ttl: document.getElementById('cacheTTL').value,
+      strategy: document.getElementById('cacheStrategy').value,
+      maxSizeInMB: parseInt(document.getElementById('cacheMaxSizeInMB').value),
+      redisUrl: document.getElementById('cacheRedisURL').value
+    };
+
+    try {
+      await OdinAPI.put('/admin/api/settings/cache', data);
+      showToast('Cache settings saved successfully. Restart required.', 'success');
+      loadGatewayInfo();
+    } catch (error) {
+      showToast('Failed to save cache settings: ' + error.message, 'danger');
+    }
+  });
+
+  document.getElementById('monitoringForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      enabled: document.getElementById('monitoringEnabled').checked,
+      path: document.getElementById('monitoringPath').value,
+      webhookUrl: document.getElementById('monitoringWebhookURL').value
+    };
+
+    try {
+      await OdinAPI.put('/admin/api/settings/monitoring', data);
+      showToast('Monitoring settings saved successfully', 'success');
+      loadGatewayInfo();
+    } catch (error) {
+      showToast('Failed to save monitoring settings: ' + error.message, 'danger');
+    }
+  });
+
+  document.getElementById('tracingForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+      enabled: document.getElementById('tracingEnabled').checked,
+      serviceName: document.getElementById('tracingServiceName').value,
+      serviceVersion: document.getElementById('tracingServiceVersion').value,
+      environment: document.getElementById('tracingEnvironment').value,
+      endpoint: document.getElementById('tracingEndpoint').value,
+      sampleRate: parseFloat(document.getElementById('tracingSampleRate').value),
+      insecure: document.getElementById('tracingInsecure').checked
+    };
+
+    try {
+      await OdinAPI.put('/admin/api/settings/tracing', data);
+      showToast('Tracing settings saved successfully. Restart required.', 'success');
+      loadGatewayInfo();
+    } catch (error) {
+      showToast('Failed to save tracing settings: ' + error.message, 'danger');
+    }
+  });
+
+  // Button handlers
+  document.getElementById('exportBtn').addEventListener('click', () => {
+    window.location.href = '/admin/api/settings/export';
+  });
+
+  document.getElementById('reloadBtn').addEventListener('click', async () => {
+    if (await confirm('Reload configuration from file? This may require a restart.', 'Reload Config')) {
+      try {
+        await OdinAPI.post('/admin/api/settings/reload', {});
+        showToast('Configuration reload initiated', 'success');
+        loadGatewayInfo();
+      } catch (error) {
+        showToast('Failed to reload configuration: ' + error.message, 'danger');
+      }
+    }
+  });
+
+  document.getElementById('clearCacheBtn').addEventListener('click', async () => {
+    if (await confirm('Clear all cached responses?', 'Clear Cache')) {
+      try {
+        await OdinAPI.post('/admin/api/settings/cache/clear', {});
+        showToast('Cache cleared successfully', 'success');
+      } catch (error) {
+        showToast('Failed to clear cache: ' + error.message, 'danger');
+      }
+    }
+  });
+
+  // Load settings when tabs are shown
+  document.querySelectorAll('button[data-bs-toggle="tab"]').forEach(button => {
+    button.addEventListener('shown.bs.tab', (event) => {
+      const target = event.target.getAttribute('data-bs-target');
+      switch (target) {
+        case '#server':
+          loadServerSettings();
+          break;
+        case '#logging':
+          loadLoggingSettings();
+          break;
+        case '#ratelimit':
+          loadRateLimitSettings();
+          break;
+        case '#cache':
+          loadCacheSettings();
+          break;
+        case '#monitoring':
+          loadMonitoringSettings();
+          break;
+        case '#tracing':
+          loadTracingSettings();
+          break;
+      }
+    });
+  });
+
+  // Initial load
+  loadGatewayInfo();
+  loadServerSettings();
+</script>
+{{end}}

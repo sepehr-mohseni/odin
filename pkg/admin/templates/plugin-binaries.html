@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plugin Binaries - Odin Admin</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .plugins-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header-actions {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+
+        .header-actions h1 {
+            margin: 0;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .stat-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #666;
+            text-transform: uppercase;
+        }
+
+        .stat-card .value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .search-filter {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-filter input,
+        .search-filter select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .search-filter input {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .plugin-table {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        thead {
+            background: #f5f5f5;
+        }
+
+        th {
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+            color: #333;
+            border-bottom: 2px solid #ddd;
+        }
+
+        td {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+        }
+
+        tbody tr:hover {
+            background: #f9f9f9;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-badge.enabled {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.disabled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #4CAF50;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 5px;
+        }
+
+        .btn-icon {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-icon:hover {
+            opacity: 0.8;
+        }
+
+        .btn-view {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-config {
+            background: #FF9800;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #f44336;
+            color: white;
+        }
+
+        .btn-primary {
+            padding: 10px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-header h2 {
+            margin: 0;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close-btn:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .form-group textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn-secondary {
+            padding: 10px 20px;
+            background: #757575;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .btn-secondary:hover {
+            background: #616161;
+        }
+
+        .plugin-detail {
+            margin-bottom: 15px;
+        }
+
+        .plugin-detail strong {
+            display: block;
+            margin-bottom: 5px;
+            color: #666;
+        }
+
+        .plugin-detail p {
+            margin: 0;
+            color: #333;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-state h2 {
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .empty-state p {
+            color: #999;
+            margin-bottom: 30px;
+        }
+    </style>
+</head>
+<body>
+    {{template "header" .}}
+    {{template "nav" .}}
+
+    <div class="plugins-container">
+        <div class="header-actions">
+            <h1>Plugin Binaries</h1>
+            <a href="/admin/plugin-binaries/upload" class="btn-primary">+ Upload New Plugin</a>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <!-- Statistics -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <h3>Total Plugins</h3>
+                <div class="value" id="totalPlugins">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Enabled</h3>
+                <div class="value" id="enabledPlugins" style="color: #4CAF50;">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Disabled</h3>
+                <div class="value" id="disabledPlugins" style="color: #f44336;">0</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Size</h3>
+                <div class="value" id="totalSize" style="font-size: 24px;">0 MB</div>
+            </div>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="search-filter">
+            <input type="text" id="searchInput" placeholder="🔍 Search plugins by name or description...">
+            <select id="statusFilter">
+                <option value="">All Status</option>
+                <option value="true">Enabled</option>
+                <option value="false">Disabled</option>
+            </select>
+        </div>
+
+        <!-- Plugins Table -->
+        <div class="plugin-table">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Version</th>
+                        <th>Status</th>
+                        <th>Author</th>
+                        <th>Size</th>
+                        <th>Uploaded</th>
+                        <th>Enabled</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="pluginTableBody">
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px;">
+                            Loading plugins...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <h2>No Plugins Found</h2>
+            <p>Upload your first plugin to get started</p>
+            <a href="/admin/plugin-binaries/upload" class="btn-primary">Upload Plugin</a>
+        </div>
+    </div>
+
+    <!-- View Plugin Modal -->
+    <div id="viewModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Plugin Details</h2>
+                <button class="close-btn" onclick="closeModal('viewModal')">&times;</button>
+            </div>
+            <div id="pluginDetails"></div>
+        </div>
+    </div>
+
+    <!-- Edit Config Modal -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit Plugin Configuration</h2>
+                <button class="close-btn" onclick="closeModal('configModal')">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="configEditor">Configuration (JSON)</label>
+                <textarea id="configEditor"></textarea>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeModal('configModal')">Cancel</button>
+                <button class="btn-primary" onclick="saveConfig()">Save Configuration</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Confirm Delete</h2>
+                <button class="close-btn" onclick="closeModal('deleteModal')">&times;</button>
+            </div>
+            <p>Are you sure you want to delete this plugin? This action cannot be undone.</p>
+            <p><strong id="deletePluginName"></strong></p>
+            <div class="modal-actions">
+                <button class="btn-secondary" onclick="closeModal('deleteModal')">Cancel</button>
+                <button class="btn-delete" onclick="confirmDelete()">Delete Plugin</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let plugins = [];
+        let currentPluginId = null;
+
+        // Load plugins on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPlugins();
+            loadStats();
+
+            // Search handler
+            document.getElementById('searchInput').addEventListener('input', filterPlugins);
+            document.getElementById('statusFilter').addEventListener('change', filterPlugins);
+        });
+
+        async function loadPlugins() {
+            try {
+                const response = await fetch('/admin/api/plugin-binaries');
+                if (!response.ok) {
+                    throw new Error('Failed to load plugins');
+                }
+
+                plugins = await response.json();
+                renderPlugins(plugins);
+            } catch (error) {
+                showAlert('error', 'Failed to load plugins: ' + error.message);
+            }
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/admin/api/plugin-binaries/stats');
+                if (!response.ok) return;
+
+                const stats = await response.json();
+                document.getElementById('totalPlugins').textContent = stats.total || 0;
+                document.getElementById('enabledPlugins').textContent = stats.enabled || 0;
+                document.getElementById('disabledPlugins').textContent = stats.disabled || 0;
+                document.getElementById('totalSize').textContent = formatBytes(stats.total_size || 0);
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        }
+
+        function renderPlugins(pluginList) {
+            const tbody = document.getElementById('pluginTableBody');
+            const emptyState = document.getElementById('emptyState');
+
+            if (pluginList.length === 0) {
+                tbody.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+
+            emptyState.style.display = 'none';
+            tbody.innerHTML = pluginList.map(plugin => `
+                <tr>
+                    <td><strong>${escapeHtml(plugin.name)}</strong></td>
+                    <td>${escapeHtml(plugin.version)}</td>
+                    <td>
+                        <span class="status-badge ${plugin.enabled ? 'enabled' : 'disabled'}">
+                            ${plugin.enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                    </td>
+                    <td>${escapeHtml(plugin.author || '-')}</td>
+                    <td>${formatBytes(plugin.file_size)}</td>
+                    <td>${formatDate(plugin.uploaded_at)}</td>
+                    <td>
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${plugin.enabled ? 'checked' : ''} 
+                                onchange="togglePlugin('${plugin.id}', this.checked)">
+                            <span class="slider"></span>
+                        </label>
+                    </td>
+                    <td>
+                        <div class="action-buttons">
+                            <button class="btn-icon btn-view" onclick="viewPlugin('${plugin.id}')" title="View Details">👁️</button>
+                            <button class="btn-icon btn-config" onclick="editConfig('${plugin.id}')" title="Edit Config">⚙️</button>
+                            <button class="btn-icon btn-delete" onclick="deletePlugin('${plugin.id}', '${escapeHtml(plugin.name)}')" title="Delete">🗑️</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function filterPlugins() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('statusFilter').value;
+
+            const filtered = plugins.filter(plugin => {
+                const matchesSearch = plugin.name.toLowerCase().includes(searchTerm) ||
+                                    (plugin.description || '').toLowerCase().includes(searchTerm);
+                
+                const matchesStatus = !statusFilter || plugin.enabled.toString() === statusFilter;
+
+                return matchesSearch && matchesStatus;
+            });
+
+            renderPlugins(filtered);
+        }
+
+        async function togglePlugin(id, enabled) {
+            try {
+                const endpoint = enabled ? 'enable' : 'disable';
+                const response = await fetch(`/admin/api/plugin-binaries/${id}/${endpoint}`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Operation failed');
+                }
+
+                showAlert('success', `Plugin ${enabled ? 'enabled' : 'disabled'} successfully`);
+                loadPlugins();
+                loadStats();
+            } catch (error) {
+                showAlert('error', error.message);
+                loadPlugins(); // Refresh to reset toggle
+            }
+        }
+
+        async function viewPlugin(id) {
+            try {
+                const response = await fetch(`/admin/api/plugin-binaries/${id}`);
+                if (!response.ok) throw new Error('Failed to load plugin details');
+
+                const plugin = await response.json();
+                
+                const detailsHTML = `
+                    <div class="plugin-detail">
+                        <strong>ID</strong>
+                        <p>${plugin.id}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Name</strong>
+                        <p>${escapeHtml(plugin.name)}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Version</strong>
+                        <p>${escapeHtml(plugin.version)}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Description</strong>
+                        <p>${escapeHtml(plugin.description || 'No description')}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Author</strong>
+                        <p>${escapeHtml(plugin.author || 'Unknown')}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Go Version</strong>
+                        <p>${escapeHtml(plugin.go_version)}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Platform</strong>
+                        <p>${escapeHtml(plugin.go_os)}/${escapeHtml(plugin.go_arch)}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>SHA256</strong>
+                        <p style="font-family: monospace; font-size: 12px; word-break: break-all;">${plugin.sha256}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>File Size</strong>
+                        <p>${formatBytes(plugin.file_size)}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Uploaded</strong>
+                        <p>${new Date(plugin.uploaded_at).toLocaleString()}</p>
+                    </div>
+                    <div class="plugin-detail">
+                        <strong>Configuration</strong>
+                        <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px; overflow-x: auto;">${JSON.stringify(plugin.config, null, 2)}</pre>
+                    </div>
+                `;
+
+                document.getElementById('pluginDetails').innerHTML = detailsHTML;
+                openModal('viewModal');
+            } catch (error) {
+                showAlert('error', error.message);
+            }
+        }
+
+        async function editConfig(id) {
+            try {
+                const response = await fetch(`/admin/api/plugin-binaries/${id}`);
+                if (!response.ok) throw new Error('Failed to load plugin');
+
+                const plugin = await response.json();
+                currentPluginId = id;
+                
+                document.getElementById('configEditor').value = JSON.stringify(plugin.config, null, 2);
+                openModal('configModal');
+            } catch (error) {
+                showAlert('error', error.message);
+            }
+        }
+
+        async function saveConfig() {
+            try {
+                const configText = document.getElementById('configEditor').value;
+                const config = JSON.parse(configText);
+
+                const response = await fetch(`/admin/api/plugin-binaries/${currentPluginId}/config`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ config })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to update configuration');
+                }
+
+                showAlert('success', 'Configuration updated successfully');
+                closeModal('configModal');
+                loadPlugins();
+            } catch (error) {
+                if (error instanceof SyntaxError) {
+                    showAlert('error', 'Invalid JSON format');
+                } else {
+                    showAlert('error', error.message);
+                }
+            }
+        }
+
+        function deletePlugin(id, name) {
+            currentPluginId = id;
+            document.getElementById('deletePluginName').textContent = name;
+            openModal('deleteModal');
+        }
+
+        async function confirmDelete() {
+            try {
+                const response = await fetch(`/admin/api/plugin-binaries/${currentPluginId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to delete plugin');
+                }
+
+                showAlert('success', 'Plugin deleted successfully');
+                closeModal('deleteModal');
+                loadPlugins();
+                loadStats();
+            } catch (error) {
+                showAlert('error', error.message);
+            }
+        }
+
+        function openModal(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function showAlert(type, message) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            
+            const container = document.getElementById('alertContainer');
+            container.innerHTML = '';
+            container.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+            if (days === 0) return 'Today';
+            if (days === 1) return 'Yesterday';
+            if (days < 7) return days + ' days ago';
+            
+            return date.toLocaleDateString();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+
+    {{template "footer" .}}
+</body>
+</html>

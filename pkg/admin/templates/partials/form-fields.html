@@ -1,0 +1,118 @@
+{{define "form-field-text"}}
+<div class="mb-3">
+  <label for="{{.ID}}" class="form-label">
+    {{.Label}}
+    {{if .Required}}<span class="text-danger">*</span>{{end}}
+  </label>
+  <input 
+    type="{{if .Type}}{{.Type}}{{else}}text{{end}}" 
+    class="form-control {{if .Class}}{{.Class}}{{end}}" 
+    id="{{.ID}}" 
+    name="{{.Name}}" 
+    value="{{.Value}}"
+    {{if .Placeholder}}placeholder="{{.Placeholder}}"{{end}}
+    {{if .Required}}required{{end}}
+    {{if .Disabled}}disabled{{end}}
+  />
+  {{if .Help}}
+  <div class="form-text">{{.Help}}</div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "form-field-textarea"}}
+<div class="mb-3">
+  <label for="{{.ID}}" class="form-label">
+    {{.Label}}
+    {{if .Required}}<span class="text-danger">*</span>{{end}}
+  </label>
+  <textarea 
+    class="form-control {{if .Class}}{{.Class}}{{end}}" 
+    id="{{.ID}}" 
+    name="{{.Name}}" 
+    rows="{{if .Rows}}{{.Rows}}{{else}}3{{end}}"
+    {{if .Placeholder}}placeholder="{{.Placeholder}}"{{end}}
+    {{if .Required}}required{{end}}
+    {{if .Disabled}}disabled{{end}}
+  >{{.Value}}</textarea>
+  {{if .Help}}
+  <div class="form-text">{{.Help}}</div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "form-field-select"}}
+<div class="mb-3">
+  <label for="{{.ID}}" class="form-label">
+    {{.Label}}
+    {{if .Required}}<span class="text-danger">*</span>{{end}}
+  </label>
+  <select 
+    class="form-select {{if .Class}}{{.Class}}{{end}}" 
+    id="{{.ID}}" 
+    name="{{.Name}}"
+    {{if .Required}}required{{end}}
+    {{if .Disabled}}disabled{{end}}
+  >
+    {{if .Placeholder}}
+    <option value="">{{.Placeholder}}</option>
+    {{end}}
+    {{range .Options}}
+    <option value="{{.Value}}" {{if .Selected}}selected{{end}}>{{.Label}}</option>
+    {{end}}
+  </select>
+  {{if .Help}}
+  <div class="form-text">{{.Help}}</div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "form-field-checkbox"}}
+<div class="mb-3 form-check">
+  <input 
+    type="checkbox" 
+    class="form-check-input {{if .Class}}{{.Class}}{{end}}" 
+    id="{{.ID}}" 
+    name="{{.Name}}"
+    value="{{if .Value}}{{.Value}}{{else}}on{{end}}"
+    {{if .Checked}}checked{{end}}
+    {{if .Disabled}}disabled{{end}}
+  />
+  <label class="form-check-label" for="{{.ID}}">
+    {{.Label}}
+  </label>
+  {{if .Help}}
+  <div class="form-text">{{.Help}}</div>
+  {{end}}
+</div>
+{{end}}
+
+{{define "form-field-radio"}}
+<div class="mb-3">
+  {{if .Label}}
+  <label class="form-label">
+    {{.Label}}
+    {{if .Required}}<span class="text-danger">*</span>{{end}}
+  </label>
+  {{end}}
+  {{range .Options}}
+  <div class="form-check">
+    <input 
+      type="radio" 
+      class="form-check-input" 
+      id="{{.ID}}" 
+      name="{{$.Name}}"
+      value="{{.Value}}"
+      {{if .Checked}}checked{{end}}
+      {{if $.Disabled}}disabled{{end}}
+    />
+    <label class="form-check-label" for="{{.ID}}">
+      {{.Label}}
+    </label>
+  </div>
+  {{end}}
+  {{if .Help}}
+  <div class="form-text">{{.Help}}</div>
+  {{end}}
+</div>
+{{end}}

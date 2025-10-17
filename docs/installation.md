@@ -4,7 +4,7 @@ This guide covers different ways to install and set up the Odin API Gateway.
 
 ## Prerequisites
 
-- Go 1.24 or later
+- Go 1.25 or later
 - Git
 - Docker and Docker Compose (optional, for containerized deployment)
 

@@ -1,56 +1,19 @@
 {{define "plugin_new.html"}}
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Add Plugin - Odin API Gateway Admin</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
-    />
-    <style>
-      body {
-        padding-top: 20px;
-        padding-bottom: 40px;
-      }
-      .container {
-        max-width: 800px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <header
-        class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom"
-      >
-        <a
-          href="/admin/dashboard"
-          class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none"
-        >
-          <span class="fs-4">Odin API Gateway Admin</span>
-        </a>
-        <ul class="nav nav-pills">
-          <li class="nav-item">
-            <a href="/admin/dashboard" class="nav-link">Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/services" class="nav-link">Services</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/plugins" class="nav-link active">Plugins</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/monitoring" class="nav-link">Monitoring</a>
-          </li>
-        </ul>
-      </header>
+{{template "base" .}}
+{{end}}
 
-      <main>
+{{define "title"}}Add Plugin - Odin Admin{{end}}
+
+{{define "head-extra"}}
+<style>
+  .container {
+    max-width: 800px;
+  }
+</style>
+{{end}}
+
+{{define "content"}}
+<main>
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h1>
             <i class="bi bi-plus-circle"></i> Add New Plugin
@@ -112,19 +75,88 @@
           </div>
 
           <div class="mb-3">
-            <label for="binaryPath" class="form-label">Binary Path (.so file) <span class="text-danger">*</span></label>
-            <input
-              type="text"
-              class="form-control"
-              id="binaryPath"
-              name="binaryPath"
-              placeholder="/path/to/plugin.so"
-              required
-            />
-            <div class="form-text">Absolute path to the compiled Go plugin (.so file)</div>
+            <label class="form-label">Plugin Source</label>
+            <div class="btn-group w-100 mb-2" role="group">
+              <input type="radio" class="btn-check" name="sourceType" id="sourceTypeFile" value="file" checked>
+              <label class="btn btn-outline-primary" for="sourceTypeFile">
+                <i class="bi bi-file-earmark-binary"></i> Upload .so File
+              </label>
+              
+              <input type="radio" class="btn-check" name="sourceType" id="sourceTypePath" value="path">
+              <label class="btn btn-outline-primary" for="sourceTypePath">
+                <i class="bi bi-folder"></i> Use Path
+              </label>
+              
+              <input type="radio" class="btn-check" name="sourceType" id="sourceTypeTemplate" value="template">
+              <label class="btn btn-outline-primary" for="sourceTypeTemplate">
+                <i class="bi bi-file-code"></i> From Template
+              </label>
+            </div>
+
+            <!-- File Upload Option -->
+            <div id="fileUploadSection" class="source-section">
+              <label for="pluginFile" class="form-label">Upload Plugin Binary <span class="text-danger">*</span></label>
+              <input
+                type="file"
+                class="form-control"
+                id="pluginFile"
+                name="pluginFile"
+                accept=".so"
+              />
+              <div class="form-text">Upload a pre-compiled Go plugin (.so file)</div>
+            </div>
+
+            <!-- Path Option -->
+            <div id="pathSection" class="source-section" style="display:none;">
+              <label for="binaryPath" class="form-label">Binary Path <span class="text-danger">*</span></label>
+              <input
+                type="text"
+                class="form-control"
+                id="binaryPath"
+                name="binaryPath"
+                placeholder="/path/to/plugin.so"
+              />
+              <div class="form-text">Absolute path to the compiled Go plugin (.so file)</div>
+            </div>
+
+            <!-- Template Option -->
+            <div id="templateSection" class="source-section" style="display:none;">
+              <label for="templateType" class="form-label">Select Template <span class="text-danger">*</span></label>
+              <select class="form-select" id="templateType" name="templateType">
+                <option value="">Choose a template...</option>
+                <option value="auth">Authentication Plugin</option>
+                <option value="ratelimit">Rate Limiting Plugin</option>
+                <option value="logging">Logging Plugin</option>
+                <option value="transform">Request/Response Transformation</option>
+                <option value="cache">Caching Plugin</option>
+                <option value="custom">Custom Plugin (Blank)</option>
+              </select>
+              <div class="form-text mt-2">Templates will be built automatically on the server</div>
+              
+              <div id="templateInfo" class="alert alert-info mt-3" style="display:none;">
+                <h6 class="alert-heading">Template Details</h6>
+                <p id="templateDescription"></p>
+              </div>
+            </div>
           </div>
 
           <div class="mb-3">
+            <label class="form-label">Plugin Type</label>
+            <div class="btn-group w-100 mb-2" role="group">
+              <input type="radio" class="btn-check" name="pluginType" id="typeHooks" value="hooks" checked>
+              <label class="btn btn-outline-secondary" for="typeHooks">
+                <i class="bi bi-hook"></i> Hook-based
+              </label>
+              
+              <input type="radio" class="btn-check" name="pluginType" id="typeMiddleware" value="middleware">
+              <label class="btn btn-outline-secondary" for="typeMiddleware">
+                <i class="bi bi-layers"></i> Middleware
+              </label>
+            </div>
+            <div class="form-text">Hook-based plugins run at specific lifecycle points. Middleware plugins wrap requests like Traefik.</div>
+          </div>
+
+          <div class="mb-3" id="hooksSection">
             <label class="form-label">Hooks <span class="text-danger">*</span></label>
             <div class="form-text mb-2">Select which hooks this plugin implements:</div>
             <div class="form-check">
@@ -177,6 +209,19 @@
             </div>
           </div>
 
+          <div class="mb-3" id="middlewareInfo" style="display:none;">
+            <div class="alert alert-info">
+              <h6 class="alert-heading"><i class="bi bi-info-circle"></i> Middleware Mode</h6>
+              <p>
+                In middleware mode, your plugin wraps HTTP requests similar to Traefik's middleware chain.
+                The plugin should implement the <code>Middleware</code> interface with a <code>Handle(next echo.HandlerFunc) echo.HandlerFunc</code> method.
+              </p>
+              <p class="mb-0">
+                <strong>Example:</strong> Authentication middleware, CORS handler, request logging, etc.
+              </p>
+            </div>
+          </div>
+
           <div class="mb-3">
             <label for="appliedTo" class="form-label">Applied To Routes</label>
             <textarea
@@ -226,66 +271,12 @@
           </div>
         </form>
       </main>
+{{end}}
 
-      <footer class="pt-3 mt-5 text-muted border-top">
-        © 2025 Odin API Gateway
-      </footer>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-      // Handle form submission with JSON config
-      document.getElementById('pluginForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(this);
-        const data = {
-          name: formData.get('name'),
-          version: formData.get('version'),
-          author: formData.get('author') || '',
-          description: formData.get('description') || '',
-          binaryPath: formData.get('binaryPath'),
-          hooks: formData.getAll('hooks'),
-          appliedTo: formData.get('appliedTo') ? formData.get('appliedTo').split('\n').filter(s => s.trim()) : [],
-          enabled: formData.has('enabled'),
-          config: {}
-        };
-        
-        // Parse config JSON if provided
-        const configText = formData.get('config');
-        if (configText && configText.trim()) {
-          try {
-            data.config = JSON.parse(configText);
-          } catch (err) {
-            alert('Invalid JSON in configuration: ' + err.message);
-            return;
-          }
-        }
-        
-        // Submit as JSON
-        fetch('/admin/api/plugins', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        })
-        .then(response => {
-          if (!response.ok) {
-            return response.json().then(err => {
-              throw new Error(err.error || 'Failed to create plugin');
-            });
-          }
-          return response.json();
-        })
-        .then(data => {
-          window.location.href = '/admin/plugins';
-        })
-        .catch(error => {
-          alert('Error creating plugin: ' + error.message);
-        });
-      });
-    </script>
-  </body>
-</html>
+{{define "scripts"}}
+<script src="/static/js/plugins.js"></script>
+<script>
+  // Initialize plugin form handlers
+  initPluginForm();
+</script>
 {{end}}

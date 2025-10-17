@@ -1,61 +1,23 @@
 {{define "plugin_detail.html"}}
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{.Plugin.Name}} - Odin API Gateway Admin</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css"
-    />
-    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
-    <style>
-      body {
-        padding-top: 20px;
-        padding-bottom: 40px;
-      }
-      .container {
-        max-width: 900px;
-      }
-      .info-label {
-        font-weight: 600;
-        color: #6c757d;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <header
-        class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom"
-      >
-        <a
-          href="/admin/dashboard"
-          class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none"
-        >
-          <span class="fs-4">Odin API Gateway Admin</span>
-        </a>
-        <ul class="nav nav-pills">
-          <li class="nav-item">
-            <a href="/admin/dashboard" class="nav-link">Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/services" class="nav-link">Services</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/plugins" class="nav-link active">Plugins</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/monitoring" class="nav-link">Monitoring</a>
-          </li>
-        </ul>
-      </header>
+{{template "base" .}}
+{{end}}
 
-      <main>
+{{define "title"}}{{.Plugin.Name}} - Odin Admin{{end}}
+
+{{define "head-extra"}}
+<style>
+  .container {
+    max-width: 900px;
+  }
+  .info-label {
+    font-weight: 600;
+    color: #6c757d;
+  }
+</style>
+{{end}}
+
+{{define "content"}}
+<main>
         <div class="d-flex justify-content-between align-items-center mb-4">
           <h1>
             <i class="bi bi-plugin"></i> {{.Plugin.Name}}
@@ -367,80 +329,62 @@
           </form>
         </div>
       </main>
+{{end}}
 
-      <footer class="pt-3 mt-4 text-muted border-top">
-        © 2025 Odin API Gateway
-      </footer>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-      function toggleEditMode() {
-        const viewMode = document.getElementById('viewMode');
-        const editMode = document.getElementById('editMode');
-        const editBtn = document.getElementById('editBtn');
-        
-        if (viewMode.style.display === 'none') {
-          viewMode.style.display = 'block';
-          editMode.style.display = 'none';
-          editBtn.innerHTML = '<i class="bi bi-pencil"></i> Edit';
-        } else {
-          viewMode.style.display = 'none';
-          editMode.style.display = 'block';
-          editBtn.innerHTML = '<i class="bi bi-eye"></i> View';
-        }
+{{define "scripts"}}
+<script src="/static/js/plugins.js"></script>
+<script>
+  function toggleEditMode() {
+    const viewMode = document.getElementById('viewMode');
+    const editMode = document.getElementById('editMode');
+    const editBtn = document.getElementById('editBtn');
+    
+    if (viewMode.style.display === 'none') {
+      viewMode.style.display = 'block';
+      editMode.style.display = 'none';
+      editBtn.innerHTML = '<i class="bi bi-pencil"></i> Edit';
+    } else {
+      viewMode.style.display = 'none';
+      editMode.style.display = 'block';
+      editBtn.innerHTML = '<i class="bi bi-eye"></i> View';
+    }
+  }
+  
+  // Handle edit form submission
+  document.getElementById('editForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const data = {
+      version: formData.get('version'),
+      author: formData.get('author') || '',
+      description: formData.get('description') || '',
+      binaryPath: formData.get('binaryPath'),
+      hooks: formData.getAll('hooks'),
+      appliedTo: formData.get('appliedTo') ? formData.get('appliedTo').split('\n').filter(s => s.trim()) : [],
+      config: {}
+    };
+    
+    // Parse config JSON
+    const configText = formData.get('config');
+    if (configText && configText.trim()) {
+      try {
+        data.config = JSON.parse(configText);
+      } catch (err) {
+        showToast('Invalid JSON in configuration: ' + err.message, 'danger');
+        return;
       }
-      
-      // Handle edit form submission
-      document.getElementById('editForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const formData = new FormData(this);
-        const data = {
-          version: formData.get('version'),
-          author: formData.get('author') || '',
-          description: formData.get('description') || '',
-          binaryPath: formData.get('binaryPath'),
-          hooks: formData.getAll('hooks'),
-          appliedTo: formData.get('appliedTo') ? formData.get('appliedTo').split('\n').filter(s => s.trim()) : [],
-          config: {}
-        };
-        
-        // Parse config JSON
-        const configText = formData.get('config');
-        if (configText && configText.trim()) {
-          try {
-            data.config = JSON.parse(configText);
-          } catch (err) {
-            alert('Invalid JSON in configuration: ' + err.message);
-            return;
-          }
-        }
-        
-        // Submit as JSON
-        fetch('/admin/api/plugins/{{.Plugin.Name}}', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(data)
-        })
-        .then(response => {
-          if (!response.ok) {
-            return response.json().then(err => {
-              throw new Error(err.error || 'Failed to update plugin');
-            });
-          }
-          return response.json();
-        })
-        .then(data => {
-          location.reload();
-        })
-        .catch(error => {
-          alert('Error updating plugin: ' + error.message);
-        });
+    }
+    
+    // Submit using API module
+    OdinAPI.plugins.update('{{.Plugin.Name}}', data)
+      .then(() => {
+        showToast('Plugin updated successfully', 'success');
+        setTimeout(() => location.reload(), 1000);
+      })
+      .catch(error => {
+        showToast('Error updating plugin: ' + error.message, 'danger');
       });
-    </script>
-  </body>
-</html>
+  });
+</script>
 {{end}}

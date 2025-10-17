@@ -310,3 +310,8 @@ func parseAggregationConfig(c echo.Context, enabled bool) *config.AggregationCon
 	aggregationConfig.Dependencies = dependencies
 	return aggregationConfig
 }
+
+// handleIntegrationsPostman renders the Postman integration page
+func (h *AdminHandler) handleIntegrationsPostman(c echo.Context) error {
+	return h.renderTemplate(c, "integrations_postman.html", nil)
+}

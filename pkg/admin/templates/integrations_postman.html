@@ -1,0 +1,499 @@
+{{define "content"}}
+<div class="row mb-4">
+    <div class="col">
+        <h2>Postman Integration</h2>
+        <p class="text-muted">Synchronize and test your API collections with Postman API Platform</p>
+    </div>
+</div>
+
+<!-- Status Cards -->
+<div class="row mb-4" id="status-cards">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Connection</h6>
+                <h3 class="card-title" id="connection-status">
+                    <span class="badge bg-secondary">Loading...</span>
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Auto Sync</h6>
+                <h3 class="card-title" id="autosync-status">
+                    <span class="badge bg-secondary">Loading...</span>
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Sync Status</h6>
+                <h3 class="card-title" id="sync-status">
+                    <span class="badge bg-secondary">Loading...</span>
+                </h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">Collections</h6>
+                <h3 class="card-title" id="collection-count">
+                    <span class="badge bg-secondary">0</span>
+                </h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuration Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Configuration</h5>
+    </div>
+    <div class="card-body">
+        <form id="config-form">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="apiKey" class="form-label">Postman API Key</label>
+                        <input type="password" class="form-control" id="apiKey" placeholder="PMAK-...">
+                        <small class="form-text text-muted">Get your API key from Postman Team settings</small>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="workspaceId" class="form-label">Workspace ID (Optional)</label>
+                        <input type="text" class="form-control" id="workspaceId" placeholder="workspace-id">
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label for="syncInterval" class="form-label">Sync Interval</label>
+                        <select class="form-select" id="syncInterval">
+                            <option value="5m">Every 5 minutes</option>
+                            <option value="15m" selected>Every 15 minutes</option>
+                            <option value="30m">Every 30 minutes</option>
+                            <option value="1h">Every hour</option>
+                            <option value="6h">Every 6 hours</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-3">
+                        <label class="form-label">Options</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="enabled">
+                            <label class="form-check-label" for="enabled">Enable Integration</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="autoSync">
+                            <label class="form-check-label" for="autoSync">Enable Auto Sync</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="newmanEnabled">
+                            <label class="form-check-label" for="newmanEnabled">Enable Newman Testing</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Save Configuration</button>
+                <button type="button" class="btn btn-outline-primary" onclick="testConnection()">Test Connection</button>
+                <button type="button" class="btn btn-outline-secondary" onclick="loadConfig()">Reload</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Collections Section -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Collections</h5>
+        <div>
+            <button class="btn btn-sm btn-primary" onclick="loadCollections()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="collections-loading" class="text-center py-4">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+        <div id="collections-list" style="display: none;">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Description</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="collections-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Sync History Section -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Sync History</h5>
+        <div>
+            <button class="btn btn-sm btn-success" onclick="syncAll()">Sync All Now</button>
+            <button class="btn btn-sm btn-primary" onclick="loadSyncHistory()">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Collection</th>
+                    <th>Service</th>
+                    <th>Direction</th>
+                    <th>Status</th>
+                    <th>Items</th>
+                    <th>Duration</th>
+                </tr>
+            </thead>
+            <tbody id="sync-history-tbody">
+                <tr>
+                    <td colspan="7" class="text-center">
+                        <div class="spinner-border spinner-border-sm" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Test Results Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h5 class="mb-0">Recent Test Results</h5>
+    </div>
+    <div class="card-body">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>Collection</th>
+                    <th>Status</th>
+                    <th>Passed</th>
+                    <th>Failed</th>
+                    <th>Duration</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="test-results-tbody">
+                <tr>
+                    <td colspan="7" class="text-center text-muted">No test results available</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Collection Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Import Collection</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="import-form">
+                    <input type="hidden" id="import-collection-id">
+                    <div class="mb-3">
+                        <label for="import-service-name" class="form-label">Service Name</label>
+                        <input type="text" class="form-control" id="import-service-name" required>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="import-auto-sync" checked>
+                        <label class="form-check-label" for="import-auto-sync">Enable Auto Sync</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="import-auto-test" checked>
+                        <label class="form-check-label" for="import-auto-test">Enable Auto Testing</label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="importCollection()">Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Load status on page load
+document.addEventListener('DOMContentLoaded', function() {
+    loadStatus();
+    loadConfig();
+    loadCollections();
+    loadSyncHistory();
+});
+
+// Load integration status
+function loadStatus() {
+    fetch('/admin/api/integrations/postman/status')
+        .then(res => res.json())
+        .then(data => {
+            // Update connection status
+            const connBadge = document.getElementById('connection-status');
+            connBadge.innerHTML = data.connected 
+                ? '<span class="badge bg-success">Connected</span>'
+                : '<span class="badge bg-danger">Disconnected</span>';
+            
+            // Update auto sync status
+            const syncBadge = document.getElementById('autosync-status');
+            syncBadge.innerHTML = data.autoSync 
+                ? '<span class="badge bg-success">Enabled</span>'
+                : '<span class="badge bg-secondary">Disabled</span>';
+            
+            // Update sync running status
+            const statusBadge = document.getElementById('sync-status');
+            statusBadge.innerHTML = data.syncRunning
+                ? '<span class="badge bg-primary">Running</span>'
+                : '<span class="badge bg-secondary">Stopped</span>';
+            
+            // Update collection count
+            document.getElementById('collection-count').innerHTML = 
+                `<span class="badge bg-info">${data.mappings || 0}</span>`;
+        })
+        .catch(err => console.error('Failed to load status:', err));
+}
+
+// Load configuration
+function loadConfig() {
+    fetch('/admin/api/integrations/postman/config')
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                console.log('No configuration found');
+                return;
+            }
+            document.getElementById('apiKey').value = data.apiKey || '';
+            document.getElementById('workspaceId').value = data.workspaceId || '';
+            document.getElementById('syncInterval').value = data.syncInterval || '15m';
+            document.getElementById('enabled').checked = data.enabled || false;
+            document.getElementById('autoSync').checked = data.autoSync || false;
+            document.getElementById('newmanEnabled').checked = data.newman?.enabled || false;
+        })
+        .catch(err => console.error('Failed to load config:', err));
+}
+
+// Save configuration
+document.getElementById('config-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const config = {
+        enabled: document.getElementById('enabled').checked,
+        apiKey: document.getElementById('apiKey').value,
+        workspaceId: document.getElementById('workspaceId').value,
+        autoSync: document.getElementById('autoSync').checked,
+        syncInterval: document.getElementById('syncInterval').value,
+        newman: {
+            enabled: document.getElementById('newmanEnabled').checked,
+            runOnDeploy: false,
+            reporters: ['json'],
+            timeout: 30000,
+            iterations: 1
+        },
+        sync: {
+            collections: true,
+            environments: false,
+            monitors: false,
+            mockServers: false
+        },
+        mappings: []
+    };
+    
+    fetch('/admin/api/integrations/postman/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert('Configuration saved successfully!');
+        loadStatus();
+    })
+    .catch(err => {
+        alert('Failed to save configuration: ' + err);
+    });
+});
+
+// Test connection
+function testConnection() {
+    fetch('/admin/api/integrations/postman/connect', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            if (data.connected) {
+                alert('✓ Connection successful!');
+            } else {
+                alert('✗ Connection failed: ' + data.error);
+            }
+        })
+        .catch(err => alert('Connection test failed: ' + err));
+}
+
+// Load collections
+function loadCollections() {
+    document.getElementById('collections-loading').style.display = 'block';
+    document.getElementById('collections-list').style.display = 'none';
+    
+    fetch('/admin/api/integrations/postman/collections')
+        .then(res => res.json())
+        .then(data => {
+            const tbody = document.getElementById('collections-tbody');
+            tbody.innerHTML = '';
+            
+            if (data.collections && data.collections.length > 0) {
+                data.collections.forEach(col => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${col.name}</td>
+                        <td>${col.info?.description || '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-primary" onclick="showImportModal('${col.uid}', '${col.name}')">
+                                Import
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="runTests('${col.uid}')">
+                                Test
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="viewCollection('${col.uid}')">
+                                View
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center">No collections found</td></tr>';
+            }
+            
+            document.getElementById('collections-loading').style.display = 'none';
+            document.getElementById('collections-list').style.display = 'block';
+        })
+        .catch(err => {
+            console.error('Failed to load collections:', err);
+            document.getElementById('collections-loading').innerHTML = 
+                '<div class="alert alert-danger">Failed to load collections</div>';
+        });
+}
+
+// Show import modal
+function showImportModal(collectionId, collectionName) {
+    document.getElementById('import-collection-id').value = collectionId;
+    document.getElementById('import-service-name').value = collectionName.toLowerCase().replace(/\s+/g, '-');
+    new bootstrap.Modal(document.getElementById('importModal')).show();
+}
+
+// Import collection
+function importCollection() {
+    const collectionId = document.getElementById('import-collection-id').value;
+    const serviceName = document.getElementById('import-service-name').value;
+    const autoSync = document.getElementById('import-auto-sync').checked;
+    const autoTest = document.getElementById('import-auto-test').checked;
+    
+    fetch(`/admin/api/integrations/postman/collections/${collectionId}/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceName, autoSync, autoTest })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert('Collection imported successfully! ' + data.routeCount + ' routes extracted.');
+        bootstrap.Modal.getInstance(document.getElementById('importModal')).hide();
+        loadStatus();
+    })
+    .catch(err => alert('Import failed: ' + err));
+}
+
+// Sync all collections
+function syncAll() {
+    if (!confirm('Start syncing all configured collections?')) return;
+    
+    fetch('/admin/api/integrations/postman/sync', { method: 'POST' })
+        .then(res => res.json())
+        .then(data => {
+            alert('Sync started in background');
+            setTimeout(loadSyncHistory, 2000);
+        })
+        .catch(err => alert('Sync failed: ' + err));
+}
+
+// Load sync history
+function loadSyncHistory() {
+    fetch('/admin/api/integrations/postman/sync/history?limit=20')
+        .then(res => res.json())
+        .then(data => {
+            const tbody = document.getElementById('sync-history-tbody');
+            tbody.innerHTML = '';
+            
+            if (data.history && data.history.length > 0) {
+                data.history.forEach(sync => {
+                    const row = document.createElement('tr');
+                    const statusBadge = sync.status === 'completed' ? 'success' : 
+                                       sync.status === 'failed' ? 'danger' : 'warning';
+                    const duration = sync.completed_at ? 
+                        Math.round((new Date(sync.completed_at) - new Date(sync.started_at)) / 1000) : '-';
+                    
+                    row.innerHTML = `
+                        <td>${new Date(sync.started_at).toLocaleString()}</td>
+                        <td>${sync.collection_name || '-'}</td>
+                        <td>${sync.service_name || '-'}</td>
+                        <td>${sync.direction}</td>
+                        <td><span class="badge bg-${statusBadge}">${sync.status}</span></td>
+                        <td>${sync.items_imported || 0}</td>
+                        <td>${duration}s</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">No sync history</td></tr>';
+            }
+        })
+        .catch(err => console.error('Failed to load sync history:', err));
+}
+
+// Run tests
+function runTests(collectionId) {
+    if (!confirm('Run Newman tests for this collection?')) return;
+    
+    fetch(`/admin/api/integrations/postman/test/${collectionId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ iterations: 1, timeout: 30000 })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert('Tests started in background. Check results in a moment.');
+    })
+    .catch(err => alert('Test execution failed: ' + err));
+}
+
+// View collection details
+function viewCollection(collectionId) {
+    window.open(`/admin/api/integrations/postman/collections/${collectionId}`, '_blank');
+}
+</script>
+{{end}}

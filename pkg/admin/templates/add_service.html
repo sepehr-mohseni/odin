@@ -1,56 +1,21 @@
 {{define "add_service.html"}}
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Add Service - Odin API Gateway Admin</title>
-    <link
-      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
-      rel="stylesheet"
-    />
-    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
-  </head>
-  <body>
-    <div class="container">
-      <header
-        class="d-flex flex-wrap justify-content-between py-3 mb-4 border-bottom"
-      >
-        <a
-          href="/admin/dashboard"
-          class="d-flex align-items-center mb-3 mb-md-0 text-decoration-none"
-        >
-          <span class="fs-4">Odin API Gateway Admin</span>
-        </a>
-        <ul class="nav nav-pills">
-          <li class="nav-item">
-            <a href="/admin/dashboard" class="nav-link">Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/monitoring" class="nav-link">Monitoring</a>
-          </li>
-          <li class="nav-item">
-            <a href="/admin/services/new" class="nav-link active"
-              >Add Service</a
-            >
-          </li>
-          <li class="nav-item">
-            <a href="/admin/login" class="nav-link">Logout</a>
-          </li>
-        </ul>
-      </header>
+{{template "base" .}}
+{{end}}
 
-      <div class="row">
-        <div class="col-12">
-          <h2>Add New Service</h2>
+{{define "title"}}Add Service - Odin Admin{{end}}
 
-          <div id="form-messages"></div>
+{{define "content"}}
+<div class="row">
+  <div class="col-12">
+    <h2>Add New Service</h2>
 
-          <form
-            hx-post="/admin/services"
-            hx-target="#form-messages"
-            hx-swap="innerHTML"
-          >
+    <div id="form-messages"></div>
+
+    <form
+      hx-post="/admin/services"
+      hx-target="#form-messages"
+      hx-swap="innerHTML"
+    >
             <div class="card mb-4">
               <div class="card-header">
                 <h5>Service Configuration</h5>
@@ -175,37 +140,10 @@
               <a href="/admin/dashboard" class="btn btn-secondary">Cancel</a>
             </div>
           </form>
-        </div>
-      </div>
-
-      <footer class="pt-4 my-md-5 pt-md-5 border-top">
-        <div class="row">
-          <div class="col-12 col-md text-center">
-            <small class="d-block mb-3 text-muted"
-              >&copy; 2025 Odin API Gateway</small
-            >
-          </div>
-        </div>
-      </footer>
     </div>
+  </div>
+{{end}}
 
-    <script>
-      document.addEventListener('htmx:afterSwap', function (event) {
-        const redirectTo = event.detail.xhr.getResponseHeader('HX-Redirect');
-        if (redirectTo) {
-          window.location.href = redirectTo;
-        }
-      });
-
-      document.addEventListener('htmx:responseError', function (event) {
-        if (
-          event.detail.xhr.status === 401 ||
-          event.detail.xhr.status === 403
-        ) {
-          window.location.href = '/admin/login';
-        }
-      });
-    </script>
-  </body>
-</html>
+{{define "scripts"}}
+<!-- HTMX event handlers already in ui.js -->
 {{end}}

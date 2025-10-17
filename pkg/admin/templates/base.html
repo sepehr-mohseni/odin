@@ -1,0 +1,49 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{block "title" .}}Odin API Gateway Admin{{end}}</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/base.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+    <link rel="stylesheet" href="/static/css/layout.css" />
+    <link rel="stylesheet" href="/static/css/utilities.css" />
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.11"></script>
+    
+    {{block "head-extra" .}}{{end}}
+  </head>
+  <body>
+    {{block "body-content" .}}
+    <div class="{{block "container-class" .}}container{{end}}">
+      {{template "header" .}}
+      
+      <div id="content">
+        {{block "content" .}}{{end}}
+      </div>
+      
+      {{template "footer" .}}
+    </div>
+    {{end}}
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JS -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/ui.js"></script>
+    
+    {{block "scripts" .}}{{end}}
+  </body>
+</html>
+{{end}}

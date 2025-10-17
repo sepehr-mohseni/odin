@@ -1,0 +1,417 @@
+{{define "middleware_chain.html"}}
+{{template "base" .}}
+{{end}}
+
+{{define "title"}}Middleware Chain - Odin Admin{{end}}
+
+{{define "content"}}
+<div class="row mb-4">
+  <div class="col">
+    <h2><i class="bi bi-diagram-3"></i> Middleware Chain</h2>
+    <p class="text-muted">Manage the request processing pipeline with drag-and-drop ordering</p>
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-secondary" id="statsBtn">
+      <i class="bi bi-graph-up"></i> Statistics
+    </button>
+    <button class="btn btn-outline-primary" id="reloadAllBtn">
+      <i class="bi bi-arrow-clockwise"></i> Reload All
+    </button>
+    <button class="btn btn-primary" id="addMiddlewareBtn">
+      <i class="bi bi-plus-lg"></i> Register Middleware
+    </button>
+  </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4" id="statsCards" style="display: none;">
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Total Middlewares</h6>
+        <h3 class="mb-0" id="statTotal">-</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Active in Chain</h6>
+        <h3 class="mb-0" id="statActive">-</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Global Middlewares</h6>
+        <h3 class="mb-0" id="statGlobal">-</h3>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="card-subtitle mb-2 text-muted">Route-Specific</h6>
+        <h3 class="mb-0" id="statRouteSpecific">-</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Phase Tabs -->
+<ul class="nav nav-tabs mb-3" id="phaseTabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="all-tab" data-bs-toggle="tab" data-bs-target="#all" type="button">
+      All Middlewares
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="pre-auth-tab" data-bs-toggle="tab" data-bs-target="#pre-auth" type="button">
+      Pre-Auth
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="post-auth-tab" data-bs-toggle="tab" data-bs-target="#post-auth" type="button">
+      Post-Auth
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="pre-route-tab" data-bs-toggle="tab" data-bs-target="#pre-route" type="button">
+      Pre-Route
+    </button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="post-route-tab" data-bs-toggle="tab" data-bs-target="#post-route" type="button">
+      Post-Route
+    </button>
+  </li>
+</ul>
+
+<div class="tab-content" id="phaseTabContent">
+  <!-- All Middlewares Tab -->
+  <div class="tab-pane fade show active" id="all" role="tabpanel">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Middleware Execution Chain</h5>
+        <div class="alert alert-info">
+          <i class="bi bi-info-circle"></i> <strong>Drag and drop</strong> to reorder middleware. Lower priority numbers execute first.
+        </div>
+        <div id="middlewareChain" class="middleware-chain-container">
+          <!-- Middleware items will be loaded here -->
+        </div>
+        <div id="emptyState" class="text-center py-5" style="display: none;">
+          <i class="bi bi-diagram-3" style="font-size: 4rem; opacity: 0.3;"></i>
+          <p class="text-muted mt-3">No middleware in the chain</p>
+          <button class="btn btn-primary" id="addFirstMiddleware">
+            <i class="bi bi-plus-lg"></i> Register First Middleware
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Phase-specific tabs -->
+  <div class="tab-pane fade" id="pre-auth" role="tabpanel">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Pre-Authentication Middleware</h5>
+        <p class="text-muted">Executed before authentication checks</p>
+        <div id="preAuthChain" class="middleware-chain-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="post-auth" role="tabpanel">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Post-Authentication Middleware</h5>
+        <p class="text-muted">Executed after authentication is verified</p>
+        <div id="postAuthChain" class="middleware-chain-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="pre-route" role="tabpanel">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Pre-Routing Middleware</h5>
+        <p class="text-muted">Executed before route matching</p>
+        <div id="preRouteChain" class="middleware-chain-container"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="post-route" role="tabpanel">
+    <div class="card">
+      <div class="card-body">
+        <h5 class="card-title">Post-Routing Middleware</h5>
+        <p class="text-muted">Executed after route matching</p>
+        <div id="postRouteChain" class="middleware-chain-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Register Middleware Modal -->
+<div class="modal fade" id="registerMiddlewareModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Register Middleware</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="registerMiddlewareForm">
+          <div class="mb-3">
+            <label for="middlewareName" class="form-label">Middleware Plugin <span class="text-danger">*</span></label>
+            <select class="form-select" id="middlewareName" required>
+              <option value="">Select a loaded plugin...</option>
+            </select>
+            <div class="form-text">Only loaded plugins of type "middleware" are available</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="middlewarePriority" class="form-label">Priority (0-1000) <span class="text-danger">*</span></label>
+            <input type="range" class="form-range" id="middlewarePrioritySlider" min="0" max="1000" value="500">
+            <input type="number" class="form-control mt-2" id="middlewarePriority" min="0" max="1000" value="500" required>
+            <div class="form-text">Lower values execute first. Recommended: 0-100 (critical), 100-500 (normal), 500-1000 (low priority)</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="middlewarePhase" class="form-label">Execution Phase</label>
+            <select class="form-select" id="middlewarePhase">
+              <option value="">Unassigned</option>
+              <option value="pre-auth">Pre-Authentication</option>
+              <option value="post-auth">Post-Authentication</option>
+              <option value="pre-route">Pre-Routing</option>
+              <option value="post-route">Post-Routing</option>
+            </select>
+            <div class="form-text">Optional: Categorize by execution phase</div>
+          </div>
+
+          <div class="mb-3">
+            <label for="middlewareRoutes" class="form-label">Target Routes</label>
+            <div id="routesList" class="mb-2"></div>
+            <div class="input-group">
+              <input type="text" class="form-control" id="routeInput" placeholder="/api/users">
+              <button class="btn btn-outline-secondary" type="button" id="addRouteBtn">
+                <i class="bi bi-plus-lg"></i> Add
+              </button>
+            </div>
+            <div class="form-text">
+              Leave empty or use * for global. Patterns: /api/*, /users/:id, etc.
+            </div>
+          </div>
+
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle"></i> <strong>Note:</strong> Changes take effect immediately. Test carefully in production.
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="registerBtn">Register Middleware</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Middleware Modal -->
+<div class="modal fade" id="editMiddlewareModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Middleware</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editMiddlewareForm">
+          <input type="hidden" id="editMiddlewareName">
+          
+          <div class="mb-3">
+            <label class="form-label">Middleware Name</label>
+            <input type="text" class="form-control" id="editMiddlewareNameDisplay" readonly>
+          </div>
+
+          <div class="mb-3">
+            <label for="editMiddlewarePriority" class="form-label">Priority (0-1000)</label>
+            <input type="range" class="form-range" id="editMiddlewarePrioritySlider" min="0" max="1000" value="500">
+            <input type="number" class="form-control mt-2" id="editMiddlewarePriority" min="0" max="1000" required>
+          </div>
+
+          <div class="mb-3">
+            <label for="editMiddlewarePhase" class="form-label">Execution Phase</label>
+            <select class="form-select" id="editMiddlewarePhase">
+              <option value="">Unassigned</option>
+              <option value="pre-auth">Pre-Authentication</option>
+              <option value="post-auth">Post-Authentication</option>
+              <option value="pre-route">Pre-Routing</option>
+              <option value="post-route">Post-Routing</option>
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label for="editMiddlewareRoutes" class="form-label">Target Routes</label>
+            <div id="editRoutesList" class="mb-2"></div>
+            <div class="input-group">
+              <input type="text" class="form-control" id="editRouteInput" placeholder="/api/users">
+              <button class="btn btn-outline-secondary" type="button" id="editAddRouteBtn">
+                <i class="bi bi-plus-lg"></i> Add
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="saveMiddlewareBtn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.middleware-chain-container {
+  min-height: 200px;
+}
+
+.middleware-item {
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  cursor: move;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.middleware-item:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  border-color: #0d6efd;
+}
+
+.middleware-item.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.middleware-item.drag-over {
+  border-top: 3px solid #0d6efd;
+}
+
+.middleware-priority {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: #0d6efd;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.middleware-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.middleware-drag-handle {
+  color: #6c757d;
+  font-size: 1.5rem;
+  cursor: grab;
+}
+
+.middleware-drag-handle:active {
+  cursor: grabbing;
+}
+
+.middleware-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.middleware-version {
+  color: #6c757d;
+  font-size: 0.875rem;
+}
+
+.middleware-description {
+  color: #6c757d;
+  margin: 8px 0;
+  font-size: 0.9rem;
+}
+
+.middleware-routes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.route-badge {
+  background: #e7f3ff;
+  color: #0d6efd;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.813rem;
+  font-family: 'Courier New', monospace;
+}
+
+.route-badge.global {
+  background: #d1e7dd;
+  color: #0f5132;
+}
+
+.middleware-phase {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.813rem;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.phase-pre-auth { background: #fff3cd; color: #856404; }
+.phase-post-auth { background: #d1ecf1; color: #0c5460; }
+.phase-pre-route { background: #f8d7da; color: #721c24; }
+.phase-post-route { background: #d4edda; color: #155724; }
+
+.middleware-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.route-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #e7f3ff;
+  color: #0d6efd;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.813rem;
+  margin-right: 6px;
+  margin-bottom: 6px;
+}
+
+.route-tag .remove-route {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.route-tag .remove-route:hover {
+  color: #dc3545;
+}
+</style>
+{{end}}
+
+{{define "scripts"}}
+<script src="/static/js/middleware-chain.js"></script>
+{{end}}

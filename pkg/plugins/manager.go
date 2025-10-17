@@ -60,26 +60,72 @@ type Plugin interface {
 	Cleanup() error
 }
 
+// Middleware interface for Traefik-style middleware plugins
+type Middleware interface {
+	// Name returns the middleware name
+	Name() string
+
+	// Version returns the middleware version
+	Version() string
+
+	// Initialize initializes the middleware with configuration
+	Initialize(config map[string]interface{}) error
+
+	// Handle wraps the next handler in the chain
+	Handle(next echo.HandlerFunc) echo.HandlerFunc
+
+	// Cleanup is called when the middleware is being unloaded
+	Cleanup() error
+}
+
+// MiddlewareChain represents an ordered list of middleware
+type MiddlewareChain struct {
+	Middlewares []MiddlewareEntry
+	mu          sync.RWMutex
+}
+
+// MiddlewareEntry represents a middleware with its metadata
+type MiddlewareEntry struct {
+	Name       string
+	Middleware Middleware
+	Priority   int
+	Routes     []string // Routes this middleware applies to (supports wildcards)
+	Phase      string   // Middleware execution phase
+}
+
 // PluginManager manages all loaded plugins
 type PluginManager struct {
-	plugins map[string]Plugin
-	hooks   map[HookType][]Plugin
-	logger  *logrus.Logger
-	mu      sync.RWMutex
+	plugins         map[string]Plugin
+	middlewares     map[string]Middleware
+	hooks           map[HookType][]Plugin
+	middlewareChain *MiddlewareChain
+	tester          *MiddlewareTester
+	rollback        *MiddlewareRollback
+	logger          *logrus.Logger
+	mu              sync.RWMutex
 }
 
 // NewPluginManager creates a new plugin manager
 func NewPluginManager(logger *logrus.Logger) *PluginManager {
-	return &PluginManager{
-		plugins: make(map[string]Plugin),
+	pm := &PluginManager{
+		plugins:     make(map[string]Plugin),
+		middlewares: make(map[string]Middleware),
 		hooks: map[HookType][]Plugin{
 			PreRequestHook:   {},
 			PostRequestHook:  {},
 			PreResponseHook:  {},
 			PostResponseHook: {},
 		},
+		middlewareChain: &MiddlewareChain{
+			Middlewares: []MiddlewareEntry{},
+		},
 		logger: logger,
 	}
+
+	// Initialize tester with the plugin manager
+	pm.tester = NewMiddlewareTester(pm, logger)
+
+	return pm
 }
 
 // createPluginWrapper creates a wrapper for plugins that may have interface compatibility issues
@@ -400,4 +446,157 @@ func (pm *PluginManager) PluginMiddleware() echo.MiddlewareFunc {
 			return err
 		}
 	}
+}
+
+// LoadMiddleware loads a middleware plugin from a binary file
+func (pm *PluginManager) LoadMiddleware(name, binaryPath string, config map[string]interface{}) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	// Check if already loaded
+	if _, exists := pm.middlewares[name]; exists {
+		return fmt.Errorf("middleware %s is already loaded", name)
+	}
+
+	// Load the plugin binary
+	p, err := plugin.Open(binaryPath)
+	if err != nil {
+		return fmt.Errorf("failed to open middleware plugin: %w", err)
+	}
+
+	// Look up the Middleware symbol
+	symMiddleware, err := p.Lookup("Middleware")
+	if err != nil {
+		return fmt.Errorf("middleware plugin does not export 'Middleware' symbol: %w", err)
+	}
+
+	// Try to cast to Middleware interface
+	middleware, ok := symMiddleware.(Middleware)
+	if !ok {
+		// Try with pointer
+		if mwPtr, ok := symMiddleware.(*Middleware); ok && mwPtr != nil {
+			middleware = *mwPtr
+		} else {
+			return fmt.Errorf("middleware symbol is not of type Middleware")
+		}
+	}
+
+	// Initialize middleware
+	if err := middleware.Initialize(config); err != nil {
+		return fmt.Errorf("failed to initialize middleware: %w", err)
+	}
+
+	// Store middleware
+	pm.middlewares[name] = middleware
+
+	pm.logger.Infof("Middleware %s (v%s) loaded successfully", middleware.Name(), middleware.Version())
+	return nil
+}
+
+// UnloadMiddleware unloads a middleware plugin
+func (pm *PluginManager) UnloadMiddleware(name string) error {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+
+	middleware, exists := pm.middlewares[name]
+	if !exists {
+		return fmt.Errorf("middleware %s is not loaded", name)
+	}
+
+	// Cleanup
+	if err := middleware.Cleanup(); err != nil {
+		pm.logger.WithError(err).Warnf("Error during middleware %s cleanup", name)
+	}
+
+	delete(pm.middlewares, name)
+	pm.logger.Infof("Middleware %s unloaded", name)
+	return nil
+}
+
+// GetMiddleware returns a middleware by name
+func (pm *PluginManager) GetMiddleware(name string) (Middleware, bool) {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	middleware, exists := pm.middlewares[name]
+	return middleware, exists
+}
+
+// ListMiddlewares returns a list of loaded middleware names
+func (pm *PluginManager) ListMiddlewares() []string {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+
+	names := make([]string, 0, len(pm.middlewares))
+	for name := range pm.middlewares {
+		names = append(names, name)
+	}
+	return names
+}
+
+// GetMiddlewareHandler returns an Echo middleware handler for a loaded middleware plugin
+func (pm *PluginManager) GetMiddlewareHandler(name string) (echo.MiddlewareFunc, error) {
+	middleware, exists := pm.GetMiddleware(name)
+	if !exists {
+		return nil, fmt.Errorf("middleware %s not found", name)
+	}
+
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return middleware.Handle(next)
+	}, nil
+}
+
+// ApplyMiddlewares applies all loaded middlewares to an Echo group or router
+func (pm *PluginManager) ApplyMiddlewares(e *echo.Echo, routes []string) error {
+	pm.mu.RLock()
+	middlewareNames := make([]string, 0, len(pm.middlewares))
+	for name := range pm.middlewares {
+		middlewareNames = append(middlewareNames, name)
+	}
+	pm.mu.RUnlock()
+
+	for _, name := range middlewareNames {
+		middleware, exists := pm.GetMiddleware(name)
+		if !exists {
+			continue
+		}
+
+		// If specific routes are provided, apply only to those routes
+		if len(routes) > 0 {
+			for _, route := range routes {
+				group := e.Group(route)
+				group.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+					return middleware.Handle(next)
+				})
+			}
+		} else {
+			// Apply globally
+			e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
+				return middleware.Handle(next)
+			})
+		}
+
+		pm.logger.Infof("Applied middleware %s to routes: %v", name, routes)
+	}
+
+	return nil
+}
+
+// GetTester returns the middleware tester
+func (pm *PluginManager) GetTester() *MiddlewareTester {
+	return pm.tester
+}
+
+// SetRollback sets the rollback manager (called after repository is available)
+func (pm *PluginManager) SetRollback(rollback *MiddlewareRollback) {
+	pm.mu.Lock()
+	defer pm.mu.Unlock()
+	pm.rollback = rollback
+}
+
+// GetRollback returns the rollback manager
+func (pm *PluginManager) GetRollback() *MiddlewareRollback {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	return pm.rollback
 }

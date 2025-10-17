@@ -54,8 +54,7 @@ func (h *AdminHandler) renderTemplate(c echo.Context, templateName string, data 
 		return c.JSON(http.StatusOK, data)
 	}
 
-	// Parse all template files together to support includes
-	pattern := filepath.Join(templateDir, "*.html")
+	// Parse all template files including partials to support includes
 	tmpl, err := template.New("").Funcs(template.FuncMap{
 		"hasHook": func(hooks []string, hook string) bool {
 			for _, h := range hooks {
@@ -65,7 +64,16 @@ func (h *AdminHandler) renderTemplate(c echo.Context, templateName string, data 
 			}
 			return false
 		},
-	}).ParseGlob(pattern)
+	}).ParseGlob(filepath.Join(templateDir, "*.html"))
+
+	if err == nil {
+		// Also parse partials if they exist
+		partialsPattern := filepath.Join(templateDir, "partials", "*.html")
+		if _, err := os.Stat(filepath.Join(templateDir, "partials")); err == nil {
+			tmpl, _ = tmpl.ParseGlob(partialsPattern)
+		}
+	}
+
 	if err != nil {
 		h.logger.WithError(err).Errorf("Failed to parse templates")
 

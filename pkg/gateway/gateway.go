@@ -14,6 +14,7 @@ import (
 	"odin/pkg/graphql"
 	"odin/pkg/grpc"
 	"odin/pkg/health"
+	"odin/pkg/integrations/postman"
 	"odin/pkg/logging"
 	"odin/pkg/middleware"
 	"odin/pkg/mongodb"
@@ -223,7 +224,38 @@ func New(cfg *config.Config, configPath string, logger *logrus.Logger) (*Gateway
 		logger.Info("Plugin admin panel initialized")
 	}
 
-	// Load plugins from config if enabled (for backward compatibility)
+	// Initialize plugin upload handler if MongoDB is available
+	if mongoRepo != nil {
+		mongoDB := mongoRepo.GetDatabase()
+		if mongoDB != nil && pluginManager != nil {
+			pluginUploadHandler, err := admin.NewPluginUploadHandler(mongoDB, pluginManager, logger)
+			if err != nil {
+				logger.WithError(err).Warn("Failed to initialize plugin upload handler")
+			} else {
+				adminHandler.SetPluginUploadHandler(pluginUploadHandler)
+				logger.Info("Plugin binary upload system initialized")
+			}
+		}
+	}
+
+	// Initialize Postman integration if MongoDB is available
+	if mongoRepo != nil {
+		mongoDB := mongoRepo.GetDatabase()
+		if mongoDB != nil {
+			integrationRepo, err := postman.NewMongoDBRepository(mongoDB)
+			if err != nil {
+				logger.WithError(err).Warn("Failed to initialize Postman integration repository")
+			} else {
+				integrationHandler := admin.NewIntegrationHandler(integrationRepo, logger)
+				if err := integrationHandler.Initialize(context.Background()); err != nil {
+					logger.WithError(err).Warn("Failed to initialize Postman integration")
+				} else {
+					adminHandler.SetIntegrationHandler(integrationHandler)
+					logger.Info("Postman integration initialized")
+				}
+			}
+		}
+	} // Load plugins from config if enabled (for backward compatibility)
 	if cfg.Plugins.Enabled {
 		for _, pluginCfg := range cfg.Plugins.Plugins {
 			if pluginCfg.Enabled {
@@ -499,6 +531,17 @@ func (g *Gateway) Shutdown(ctx context.Context) error {
 		g.alertManager.Stop()
 	}
 	g.logger.Info("Health monitoring stopped")
+
+	// Stop Postman integration if initialized
+	if g.adminHandler != nil {
+		integrationHandler := g.adminHandler.GetIntegrationHandler()
+		if integrationHandler != nil {
+			g.logger.Info("Stopping Postman integration...")
+			if err := integrationHandler.Shutdown(); err != nil {
+				g.logger.WithError(err).Warn("Error stopping Postman integration")
+			}
+		}
+	}
 
 	// Stop service mesh integration
 	if g.meshManager != nil {

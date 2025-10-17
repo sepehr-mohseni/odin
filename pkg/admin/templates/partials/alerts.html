@@ -1,0 +1,43 @@
+{{define "alert-success"}}
+<div class="alert alert-success {{if .Dismissible}}alert-dismissible fade show{{end}}" role="alert">
+  <i class="bi bi-check-circle-fill me-2"></i>
+  {{if .Title}}<strong>{{.Title}}</strong> {{end}}
+  {{.Message}}
+  {{if .Dismissible}}
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  {{end}}
+</div>
+{{end}}
+
+{{define "alert-danger"}}
+<div class="alert alert-danger {{if .Dismissible}}alert-dismissible fade show{{end}}" role="alert">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  {{if .Title}}<strong>{{.Title}}</strong> {{end}}
+  {{.Message}}
+  {{if .Dismissible}}
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  {{end}}
+</div>
+{{end}}
+
+{{define "alert-warning"}}
+<div class="alert alert-warning {{if .Dismissible}}alert-dismissible fade show{{end}}" role="alert">
+  <i class="bi bi-exclamation-circle-fill me-2"></i>
+  {{if .Title}}<strong>{{.Title}}</strong> {{end}}
+  {{.Message}}
+  {{if .Dismissible}}
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  {{end}}
+</div>
+{{end}}
+
+{{define "alert-info"}}
+<div class="alert alert-info {{if .Dismissible}}alert-dismissible fade show{{end}}" role="alert">
+  <i class="bi bi-info-circle-fill me-2"></i>
+  {{if .Title}}<strong>{{.Title}}</strong> {{end}}
+  {{.Message}}
+  {{if .Dismissible}}
+  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  {{end}}
+</div>
+{{end}}

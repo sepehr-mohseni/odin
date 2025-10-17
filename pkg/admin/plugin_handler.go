@@ -33,6 +33,9 @@ func (h *PluginHandler) RegisterPluginRoutes(adminGroup *echo.Group) {
 	apiGroup := adminGroup.Group("/api/plugins")
 	apiGroup.GET("", h.listPlugins)
 	apiGroup.POST("", h.createPlugin)
+	apiGroup.POST("/upload", h.uploadPlugin)
+	apiGroup.POST("/build", h.buildPlugin)
+	apiGroup.POST("/test/:name", h.testPlugin)
 	apiGroup.GET("/:name", h.getPlugin)
 	apiGroup.PUT("/:name", h.updatePlugin)
 	apiGroup.DELETE("/:name", h.deletePlugin)
@@ -214,10 +217,19 @@ func (h *PluginHandler) enablePlugin(c echo.Context) error {
 		})
 	}
 
-	if err := h.manager.LoadPlugin(plugin.Name, plugin.BinaryPath, plugin.Config, plugin.Hooks); err != nil {
-		return c.JSON(http.StatusInternalServerError, map[string]string{
-			"error": fmt.Sprintf("Failed to load plugin: %v", err),
-		})
+	// Load based on plugin type
+	if plugin.PluginType == "middleware" {
+		if err := h.manager.LoadMiddleware(plugin.Name, plugin.BinaryPath, plugin.Config); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to load middleware: %v", err),
+			})
+		}
+	} else {
+		if err := h.manager.LoadPlugin(plugin.Name, plugin.BinaryPath, plugin.Config, plugin.Hooks); err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{
+				"error": fmt.Sprintf("Failed to load plugin: %v", err),
+			})
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{
@@ -235,9 +247,19 @@ func (h *PluginHandler) disablePlugin(c echo.Context) error {
 		})
 	}
 
-	// Unload the plugin
-	if err := h.manager.UnloadPlugin(name); err != nil {
-		c.Logger().Errorf("Failed to unload plugin %s: %v", name, err)
+	// Get plugin to check type
+	plugin, err := h.repo.GetPlugin(context.Background(), name)
+	if err == nil {
+		// Unload based on type
+		if plugin.PluginType == "middleware" {
+			if err := h.manager.UnloadMiddleware(name); err != nil {
+				c.Logger().Errorf("Failed to unload middleware %s: %v", name, err)
+			}
+		} else {
+			if err := h.manager.UnloadPlugin(name); err != nil {
+				c.Logger().Errorf("Failed to unload plugin %s: %v", name, err)
+			}
+		}
 	}
 
 	return c.JSON(http.StatusOK, map[string]string{

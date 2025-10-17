@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Plugin Binary - Odin Admin</title>
+    <link rel="stylesheet" href="/static/css/admin.css">
+    <style>
+        .upload-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .upload-area {
+            border: 3px dashed #4CAF50;
+            border-radius: 10px;
+            padding: 60px 20px;
+            text-align: center;
+            background: #f8f9fa;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        .upload-area:hover {
+            background: #e8f5e9;
+            border-color: #2e7d32;
+        }
+
+        .upload-area.dragover {
+            background: #c8e6c9;
+            border-color: #1b5e20;
+        }
+
+        .upload-area i {
+            font-size: 64px;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+
+        .upload-area p {
+            font-size: 18px;
+            color: #666;
+            margin: 10px 0;
+        }
+
+        .upload-area .btn {
+            margin-top: 20px;
+        }
+
+        .file-info {
+            display: none;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .file-info.active {
+            display: block;
+        }
+
+        .file-icon {
+            font-size: 48px;
+            color: #2196F3;
+            margin-right: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .form-group textarea {
+            font-family: 'Courier New', monospace;
+            min-height: 150px;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .progress-container {
+            display: none;
+            margin: 20px 0;
+        }
+
+        .progress-container.active {
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            width: 0%;
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+        }
+
+        .btn-secondary {
+            background: #757575;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #616161;
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .alert-error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .validation-rules {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .validation-rules h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+
+        .validation-rules ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .validation-rules li {
+            color: #856404;
+            margin: 5px 0;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 30px;
+        }
+
+        #pluginForm {
+            display: none;
+        }
+
+        #pluginForm.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    {{template "header" .}}
+    {{template "nav" .}}
+
+    <div class="upload-container">
+        <h1>Upload Plugin Binary (.so)</h1>
+
+        <div class="validation-rules">
+            <h4>⚠️ Plugin Requirements</h4>
+            <ul>
+                <li>File must be a compiled Go plugin (.so file)</li>
+                <li>Maximum file size: 50 MB</li>
+                <li>Must be compiled with Go version: <strong>1.25</strong></li>
+                <li>Must export a <code>New</code> function with signature: <code>func(map[string]interface{}) (Middleware, error)</code></li>
+                <li>Plugin will be disabled by default after upload</li>
+            </ul>
+        </div>
+
+        <div id="alertContainer"></div>
+
+        <!-- Upload Area -->
+        <div class="upload-area" id="dropzone">
+            <i class="icon">📦</i>
+            <p>Drag and drop your .so file here</p>
+            <p style="color: #999;">or</p>
+            <button class="btn btn-primary" type="button" onclick="document.getElementById('fileInput').click()">
+                Browse Files
+            </button>
+            <input type="file" id="fileInput" accept=".so" hidden>
+        </div>
+
+        <!-- File Info -->
+        <div class="file-info" id="fileInfo">
+            <div style="display: flex; align-items: center;">
+                <span class="file-icon">📄</span>
+                <div>
+                    <strong id="fileName">No file selected</strong>
+                    <p style="margin: 5px 0 0 0; color: #666;" id="fileSize">0 bytes</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Plugin Details Form -->
+        <form id="pluginForm">
+            <div class="form-group">
+                <label for="pluginName">Plugin Name *</label>
+                <input type="text" id="pluginName" name="name" required placeholder="e.g., rate-limiter">
+                <small>Unique identifier for this plugin</small>
+            </div>
+
+            <div class="form-group">
+                <label for="pluginVersion">Version *</label>
+                <input type="text" id="pluginVersion" name="version" required placeholder="e.g., 1.0.0">
+                <small>Semantic versioning format recommended</small>
+            </div>
+
+            <div class="form-group">
+                <label for="pluginDescription">Description</label>
+                <textarea id="pluginDescription" name="description" placeholder="Describe what this plugin does..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="pluginAuthor">Author</label>
+                <input type="text" id="pluginAuthor" name="author" placeholder="Your name or organization">
+            </div>
+
+            <div class="form-group">
+                <label for="pluginConfig">Configuration (JSON)</label>
+                <textarea id="pluginConfig" name="config" placeholder='{&#10;  "key": "value"&#10;}'>{}</textarea>
+                <small>Plugin configuration in JSON format</small>
+            </div>
+
+            <div class="form-group">
+                <label for="pluginRoutes">Apply to Routes</label>
+                <input type="text" id="pluginRoutes" name="routes" value="/*" placeholder="e.g., /*, /api/*, /users/*">
+                <small>Comma-separated list of route patterns</small>
+            </div>
+
+            <div class="form-group">
+                <label for="pluginPriority">Priority</label>
+                <input type="number" id="pluginPriority" name="priority" value="100" min="0" max="1000">
+                <small>Lower numbers run first (0-1000)</small>
+            </div>
+
+            <div class="form-group">
+                <label for="pluginPhase">Execution Phase</label>
+                <select id="pluginPhase" name="phase">
+                    <option value="pre-routing">Pre-Routing</option>
+                    <option value="post-routing">Post-Routing</option>
+                    <option value="pre-response">Pre-Response</option>
+                </select>
+                <small>When to execute this plugin in the request lifecycle</small>
+            </div>
+
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="resetForm()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Upload Plugin</button>
+            </div>
+        </form>
+
+        <!-- Progress Bar -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill">0%</div>
+            </div>
+            <p style="text-align: center; margin-top: 10px;" id="progressText">Uploading...</p>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const pluginForm = document.getElementById('pluginForm');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressFill = document.getElementById('progressFill');
+        const progressText = document.getElementById('progressText');
+        const alertContainer = document.getElementById('alertContainer');
+
+        // Drag and drop handlers
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('dragover');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('dragover');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFileSelect(files[0]);
+            }
+        });
+
+        // File input handler
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFileSelect(e.target.files[0]);
+            }
+        });
+
+        // Handle file selection
+        function handleFileSelect(file) {
+            // Validate file extension
+            if (!file.name.endsWith('.so')) {
+                showAlert('error', 'Please select a .so file');
+                return;
+            }
+
+            // Validate file size (50MB)
+            const maxSize = 50 * 1024 * 1024;
+            if (file.size > maxSize) {
+                showAlert('error', 'File size exceeds 50 MB');
+                return;
+            }
+
+            selectedFile = file;
+
+            // Update UI
+            fileName.textContent = file.name;
+            fileSize.textContent = formatBytes(file.size);
+            fileInfo.classList.add('active');
+            pluginForm.classList.add('active');
+            dropzone.style.display = 'none';
+
+            // Pre-fill plugin name from filename
+            const baseName = file.name.replace('.so', '');
+            document.getElementById('pluginName').value = baseName;
+        }
+
+        // Form submission
+        pluginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!selectedFile) {
+                showAlert('error', 'Please select a file');
+                return;
+            }
+
+            // Show progress
+            progressContainer.classList.add('active');
+            pluginForm.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('name', document.getElementById('pluginName').value);
+            formData.append('version', document.getElementById('pluginVersion').value);
+            formData.append('description', document.getElementById('pluginDescription').value);
+            formData.append('author', document.getElementById('pluginAuthor').value);
+            formData.append('config', document.getElementById('pluginConfig').value);
+            formData.append('routes', document.getElementById('pluginRoutes').value);
+            formData.append('priority', document.getElementById('pluginPriority').value);
+            formData.append('phase', document.getElementById('pluginPhase').value);
+
+            try {
+                const xhr = new XMLHttpRequest();
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (e.lengthComputable) {
+                        const percent = (e.loaded / e.total) * 100;
+                        updateProgress(percent, 'Uploading...');
+                    }
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status === 201) {
+                        updateProgress(100, 'Upload complete!');
+                        showAlert('success', 'Plugin uploaded successfully!');
+                        
+                        setTimeout(() => {
+                            window.location.href = '/admin/plugin-binaries';
+                        }, 2000);
+                    } else {
+                        const response = JSON.parse(xhr.responseText);
+                        showAlert('error', response.error || 'Upload failed');
+                        progressContainer.classList.remove('active');
+                        pluginForm.style.display = 'block';
+                    }
+                });
+
+                xhr.addEventListener('error', () => {
+                    showAlert('error', 'Network error occurred');
+                    progressContainer.classList.remove('active');
+                    pluginForm.style.display = 'block';
+                });
+
+                xhr.open('POST', '/admin/api/plugin-binaries/upload');
+                xhr.send(formData);
+
+            } catch (error) {
+                showAlert('error', 'Upload failed: ' + error.message);
+                progressContainer.classList.remove('active');
+                pluginForm.style.display = 'block';
+            }
+        });
+
+        function updateProgress(percent, text) {
+            progressFill.style.width = percent + '%';
+            progressFill.textContent = Math.round(percent) + '%';
+            progressText.textContent = text;
+        }
+
+        function showAlert(type, message) {
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.textContent = message;
+            alertContainer.innerHTML = '';
+            alertContainer.appendChild(alert);
+
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function resetForm() {
+            selectedFile = null;
+            fileInfo.classList.remove('active');
+            pluginForm.classList.remove('active');
+            pluginForm.reset();
+            dropzone.style.display = 'block';
+            document.getElementById('pluginConfig').value = '{}';
+        }
+    </script>
+
+    {{template "footer" .}}
+</body>
+</html>
